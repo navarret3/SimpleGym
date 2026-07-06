@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<!-- APP DEL AMIGO — PPL Recomp. Almacenamiento independiente (STORAGE_KEY = gymAmigoProgresoV1).
+     Dos bloques: "Plan actual" (5 días PPL, hasta mediados de septiembre) y "Plan Ávila" (4 días PPL+Upper). -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>PPL · Recomp — Plan del amigo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: #0a0a0a; }
+  body {
+    font-family: 'Syne', -apple-system, sans-serif; color: #f0f0f0;
+    transition: background 0.5s ease; padding-bottom: env(safe-area-inset-bottom);
+  }
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-thumb { background: #333; }
+
+  .wrap { min-height: 100vh; }
+  .glow { position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; border-radius: 50%; opacity: 0.08; filter: blur(40px); pointer-events: none; transition: background 0.5s; }
+  .header { padding: 28px 20px 0; position: relative; overflow: hidden; }
+  .eyebrow { font-size: 9px; letter-spacing: 5px; color: rgba(255,255,255,0.25); margin-bottom: 10px; font-weight: 600; }
+  .title { font-size: 38px; font-weight: 800; letter-spacing: -1.5px; line-height: 1; color: #fff; }
+  .subtitle { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 6px; font-weight: 500; }
+
+  .blockswitch { display: flex; gap: 8px; margin-top: 16px; }
+  .blockpill { flex: 1; padding: 10px 12px; border-radius: 12px; cursor: pointer; text-align: center; transition: all 0.25s; }
+  .blockpill .bp-name { font-size: 13px; font-weight: 800; letter-spacing: 0.2px; }
+  .blockpill .bp-sub { font-size: 9px; font-weight: 600; margin-top: 3px; opacity: 0.8; }
+
+  .phasepill { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 8px 12px; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .chevron { display: inline-flex; transition: transform 0.2s; }
+  .chevron.open { transform: rotate(180deg); }
+  .planpanel { margin-top: 12px; background: rgba(255,255,255,0.03); border-radius: 14px; padding: 16px; }
+  .plandesc { font-size: 13px; color: rgba(255,255,255,0.7); line-height: 1.6; margin-bottom: 14px; }
+  .planlabel { font-size: 9px; font-weight: 700; letter-spacing: 2px; color: rgba(255,255,255,0.25); margin-bottom: 8px; margin-top: 4px; }
+  .runbox { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 11px 12px; margin-bottom: 14px; }
+  .runtext { font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.6; font-weight: 500; }
+  .phaserow { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .phaserow:last-child { border-bottom: none; }
+  .phaseleft { display: flex; align-items: center; gap: 8px; }
+  .phasename { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); }
+  .phasename.current { font-weight: 800; color: #fff; }
+  .heretag { font-size: 8px; font-weight: 700; letter-spacing: 1px; }
+  .phasedate { font-size: 10px; color: rgba(255,255,255,0.3); white-space: nowrap; }
+
+  .weekpills { display: flex; gap: 7px; margin-top: 20px; }
+  .daybtn { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; transition: all 0.3s; }
+
+  .daycard-wrap { margin: 16px 20px 0; }
+  .daycard { background: rgba(255,255,255,0.04); border-radius: 16px; padding: 16px; transition: border-color 0.4s; }
+  .daycard-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .typebadge { display: inline-flex; align-items: center; gap: 6px; border-radius: 6px; padding: 3px 8px; margin-bottom: 8px; }
+  .typebadge .t1 { font-size: 9px; font-weight: 700; letter-spacing: 2px; }
+  .typebadge .sep { width: 3px; height: 3px; border-radius: 50%; display: inline-block; }
+  .typebadge .t2 { font-size: 9px; font-weight: 600; opacity: 0.7; }
+  .dayname { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+  .daysub { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 3px; }
+  .pctbox { text-align: right; }
+  .pctnum { font-size: 36px; font-weight: 800; line-height: 1; transition: color 0.3s; }
+  .pctlabel { font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,0.25); margin-top: 2px; }
+  .barbg { height: 3px; background: rgba(255,255,255,0.08); border-radius: 3px; margin-top: 14px; overflow: hidden; }
+  .barfill { height: 100%; border-radius: 3px; transition: width 0.5s cubic-bezier(.4,0,.2,1); }
+  .focus { margin-top: 12px; font-size: 12px; color: rgba(255,255,255,0.45); line-height: 1.6; font-weight: 500; }
+
+  .exlist { padding: 12px 20px; }
+  .excard { margin-bottom: 8px; border-radius: 14px; overflow: hidden; transition: all 0.25s ease; }
+  .exhead { padding: 13px 14px; display: flex; gap: 12px; align-items: center; }
+  .chk { width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; cursor: pointer; }
+  .exinfo { flex: 1; min-width: 0; cursor: pointer; }
+  .exname-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .exname { font-size: 14px; font-weight: 700; }
+  .muscletag { font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 1px; white-space: nowrap; }
+  .exmeta { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px; font-weight: 500; }
+  .expbtn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: rgba(255,255,255,0.06); transition: transform 0.25s ease; flex-shrink: 0; cursor: pointer; }
+
+  .pyramid { border-top: 1px solid rgba(255,255,255,0.06); }
+  .pyhead { display: grid; grid-template-columns: 40px 90px 1fr 60px; padding: 7px 14px; background: rgba(0,0,0,0.2); font-size: 8px; font-weight: 700; letter-spacing: 2px; color: rgba(255,255,255,0.2); }
+  .pyrow { display: grid; grid-template-columns: 40px 90px 1fr 60px; padding: 9px 14px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .pyrow:last-of-type { border-bottom: none; }
+  .pyset { font-size: 16px; font-weight: 800; }
+  .pyreps { font-size: 15px; font-weight: 700; color: #fff; }
+  .pyweight { font-size: 13px; color: rgba(255,255,255,0.5); font-weight: 500; }
+  .pyint { text-align: right; font-size: 9px; font-weight: 700; }
+  .tip { padding: 10px 14px; background: rgba(0,0,0,0.15); border-top: 1px solid rgba(255,255,255,0.05); font-size: 11px; color: rgba(255,255,255,0.35); line-height: 1.6; font-style: italic; }
+
+  .logwrap { padding: 12px 14px; border-top: 1px solid rgba(255,255,255,0.05); }
+  .logbtn { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .logform-row { display: flex; gap: 10px; margin-bottom: 10px; }
+  .logform-col { flex: 1; }
+  .logform-label { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: rgba(255,255,255,0.35); margin-bottom: 5px; }
+  .numin { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 8px; padding: 8px 10px; width: 100%; }
+  .numin:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+  .logform-actions { display: flex; gap: 8px; }
+  .logform-btn { flex: 1; text-align: center; padding: 10px; border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+
+  .overview { margin: 4px 20px 16px; padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; }
+  .overview-title { font-size: 9px; font-weight: 700; letter-spacing: 3px; color: rgba(255,255,255,0.25); margin-bottom: 12px; }
+  .overow { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .overow:last-child { border-bottom: none; }
+  .overleft { display: flex; gap: 10px; align-items: center; }
+  .overdot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .overday { font-size: 13px; font-weight: 600; }
+  .overtype { font-size: 12px; font-weight: 700; }
+  .overtag { font-size: 11px; color: rgba(255,255,255,0.25); margin-left: 6px; }
+
+  .rulebox { margin: 0 20px 16px; padding: 14px; border-radius: 14px; transition: all 0.4s; }
+  .rulelabel { font-size: 9px; font-weight: 700; letter-spacing: 3px; opacity: 0.7; margin-bottom: 8px; }
+  .ruletext { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.6; font-weight: 500; }
+
+  .footer { margin: 0 20px 40px; text-align: center; }
+  .resetlink { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 1px; cursor: pointer; padding: 8px; }
+
+  .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 50; background: #111; color: #fff; font-size: 12px; font-weight: 700; padding: 9px 16px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); white-space: nowrap; }
+  .loading { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); font-size: 13px; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">CARGANDO…</div></div>
+
+<script>
+/* ============================================================
+   PPL · RECOMP — dos bloques con el mismo motor interactivo.
+   1) "Plan actual": 5 días PPL (frecuencia 2 push/pull, 1 legs)
+      + 3 días de carrera. Hasta mediados de septiembre.
+   2) "Plan Ávila": 4 días PPL + Upper (frecuencia 2 torso, 1 legs)
+      + 2-3 días de carrera. Desde la academia.
+   Los pesos son un punto de partida: se editan desde la app y
+   se guardan en el móvil (localStorage).
+   ============================================================ */
+
+var muscleColors = {
+  "Pecho": "#FF6B35", "Pecho sup.": "#FF6B35", "Pecho inf.": "#FF6B35",
+  "Espalda": "#C8FF00", "Dorsal": "#A3E635", "Espalda alta": "#84CC16",
+  "Hombro": "#38BDF8", "Hombro lat.": "#38BDF8", "Hombro post.": "#38BDF8",
+  "Bíceps": "#E879F9", "Tríceps": "#E879F9", "Antebrazo": "#C084FC",
+  "Cuádriceps": "#FB923C", "Isquios": "#FB923C", "Glúteo": "#F472B6",
+  "Gemelos": "#34D399", "Trapecio": "#FBBF24", "Core": "#94A3B8",
+};
+
+/* ---------- BLOQUE 1: PLAN ACTUAL (5 días PPL) ---------- */
+var diasActual = [
+  {
+    id: "a-lun", label: "LUN", fullName: "PUSH A", type: "EMPUJE", tag: "Fuerza",
+    subtitle: "Pecho · Hombro · Tríceps + Abs", accent: "#C8FF00", bg: "#0f1a00",
+    focus: "Empuje pesado. Descansa 2–3 min en los compuestos. Técnica antes que ego. Al final, abdominales.",
+    exercises: [
+      { id: "a-lun-press-inc", name: "Press Superior en Multipower", muscle: "Pecho sup.", trackable: true,
+        repsPattern: [10, 10, 8, 6], offsets: [-10, -10, -5, 0], baseTop: 60, step: 2.5,
+        note: "Press inclinado guiado. Al completar las reps de la última serie → sube 2,5 kg la próxima vez." },
+      { id: "a-lun-aperturas", name: "Aperturas / Contractor (máquina)", muscle: "Pecho", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-10, -5, 0], baseTop: 55, step: 5,
+        note: "Aprieta 1 seg en el centro, estira bien al abrir." },
+      { id: "a-lun-press-plano-db", name: "Press Plano Mancuerna", muscle: "Pecho", trackable: true,
+        repsPattern: [8, 8, 6], offsets: [-6, -3, 0], baseTop: 34, step: 2,
+        note: "Peso por mancuerna. Estiramiento controlado abajo." },
+      { id: "a-lun-elev-lat", name: "Elevaciones Laterales Polea", muscle: "Hombro lat.", trackable: true,
+        repsPattern: [12, 10, 8], offsets: [-2, -1, 0], baseTop: 12, step: 1,
+        note: "3 series + dropset final (baja el peso y sigue 6–8 reps). Sube el mínimo que permita la máquina." },
+      { id: "a-lun-press-militar", name: "Press Militar Multipower", muscle: "Hombro", trackable: true,
+        repsPattern: [10, 10, 8], offsets: [-8, -4, 0], baseTop: 45, step: 2.5,
+        note: "Core apretado, sin arquear la zona lumbar." },
+      { id: "a-lun-rotador", name: "Rotación Externa (manguito)", muscle: "Hombro post.", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-3, -1, 0], baseTop: 12, step: 1,
+        note: "Salud del hombro. Movimiento lento y controlado, sin tirones." },
+      { id: "a-lun-ext-triceps", name: "Extensión Tríceps Polea + Katana", muscle: "Tríceps", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-6, -2, 0], baseTop: 27, step: 2.5,
+        note: "Superserie con katana (barra V). Codos fijos, bloqueo total abajo." },
+      { id: "a-lun-abs", name: "Abdominales · Circuito 1", muscle: "Core", trackable: false,
+        staticPyramid: [
+          { set: 1, reps: "12", weight: "Crunch" },
+          { set: 2, reps: "12", weight: "Rueda abdominal" },
+          { set: 3, reps: "12", weight: "Press Pallof" } ],
+        note: "Circuito · 3 vueltas. Core apretado, sin arquear la lumbar." },
+    ],
+  },
+  {
+    id: "a-mar", label: "MAR", fullName: "PULL A", type: "TIRÓN", tag: "Fuerza",
+    subtitle: "Espalda · Bíceps · Trapecio", accent: "#FF6B35", bg: "#1a0a00",
+    focus: "Tirón. Pausa 1 seg apretando la espalda. Hoy además carrera continua suave, 7–10 km.",
+    exercises: [
+      { id: "a-mar-dominadas", name: "Dominadas", muscle: "Espalda", trackable: false,
+        staticPyramid: [
+          { set: 1, reps: "al fallo", weight: "Corporal" },
+          { set: 2, reps: "12", weight: "Corporal" },
+          { set: 3, reps: "10", weight: "Corporal" } ],
+        note: "Cuando superes 12 limpias en la 1ª serie → añade lastre." },
+      { id: "a-mar-remo-db", name: "Remo Mancuerna en Banco", muscle: "Espalda", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-6, -3, 0], baseTop: 32, step: 2,
+        note: "Pecho apoyado en banco inclinado. Recorrido completo, pausa arriba." },
+      { id: "a-mar-pullover", name: "Pull Over en Polea", muscle: "Dorsal", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-6, -3, 0], baseTop: 30, step: 2.5,
+        note: "Brazos casi rectos, siente el estiramiento del dorsal." },
+      { id: "a-mar-remo-abierto", name: "Remo Abierto (máquina)", muscle: "Espalda alta", trackable: true,
+        repsPattern: [10, 10, 8], offsets: [-8, -4, 0], baseTop: 55, step: 2.5,
+        note: "Codos abiertos, aprieta las escápulas 1 seg." },
+      { id: "a-mar-curl-bayesian", name: "Curl Bayesian (polea)", muscle: "Bíceps", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-4, -2, 0], baseTop: 14, step: 1.25,
+        note: "Última serie al fallo. Sin balanceo." },
+      { id: "a-mar-martillo", name: "Curl Martillo", muscle: "Bíceps", trackable: true,
+        repsPattern: [10, 10, 10], offsets: [-4, -2, 0], baseTop: 16, step: 2,
+        note: "Trabaja braquial y antebrazo. Peso por mancuerna." },
+      { id: "a-mar-trapecio", name: "Encogimientos de Trapecio", muscle: "Trapecio", trackable: true,
+        repsPattern: [12, 12, 10], offsets: [-10, -5, 0], baseTop: 40, step: 2.5,
+        note: "Pausa arriba 1 seg, sin rotar los hombros." },
+    ],
+  },
+  {
+    id: "a-mie", label: "MIÉ", fullName: "LEGS", type: "PIERNA", tag: "Completa",
+    subtitle: "Cuádriceps · Isquios · Glúteo · Gemelo + Abs", accent: "#38BDF8", bg: "#001a2a",
+    focus: "Único día de pierna: no recortes nada. Hasta 3 min de descanso en prensa. Abdominales al final.",
+    exercises: [
+      { id: "a-mie-abductor", name: "Abductor (máquina)", muscle: "Glúteo", trackable: true,
+        repsPattern: [15, 12, 12], offsets: [-10, -5, 0], baseTop: 60, step: 5,
+        note: "Inclínate un poco hacia delante para cargar más el glúteo." },
+      { id: "a-mie-gemelo", name: "Gemelo (máquina)", muscle: "Gemelos", trackable: true,
+        repsPattern: [12, 12, 10], offsets: [-15, -8, 0], baseTop: 70, step: 2.5,
+        note: "Pausa 2 seg en el estiramiento de abajo. Los gemelos responden a volumen." },
+      { id: "a-mie-prensa", name: "Prensa Inclinada", muscle: "Cuádriceps", trackable: true,
+        repsPattern: [10, 8, 8, 6], offsets: [-30, -15, -5, 0], baseTop: 200, step: 5,
+        note: "Pies bajos = más cuádriceps. Al completar las reps de la última serie → sube." },
+      { id: "a-mie-hip-thrust", name: "Hip Thrust", muscle: "Glúteo", trackable: true,
+        repsPattern: [12, 10], offsets: [-15, 0], baseTop: 90, step: 5,
+        note: "Aprieta el glúteo arriba 1 seg. Barbilla metida, mirada al frente." },
+      { id: "a-mie-rumano", name: "Peso Muerto Rumano", muscle: "Isquios", trackable: true,
+        repsPattern: [10, 8, 8], offsets: [-10, -5, 0], baseTop: 80, step: 2.5,
+        note: "Series descendentes. Caderas atrás, barra pegada al cuerpo, técnica perfecta." },
+      { id: "a-mie-ext-cuad", name: "Extensión de Cuádriceps", muscle: "Cuádriceps", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-8, -4, 0], baseTop: 50, step: 2.5,
+        note: "Pausa 1 seg arriba apretando el cuádriceps." },
+      { id: "a-mie-curl-fem", name: "Curl Femoral Tumbado", muscle: "Isquios", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-8, -4, 0], baseTop: 45, step: 2.5,
+        note: "Aprieta al final del recorrido, baja controlado." },
+      { id: "a-mie-abs", name: "Abdominales · Circuito 2", muscle: "Core", trackable: false,
+        staticPyramid: [
+          { set: 1, reps: "10", weight: "Crunch" },
+          { set: 2, reps: "10", weight: "Elevaciones inferiores" },
+          { set: 3, reps: "15", weight: "Laterales" },
+          { set: 4, reps: "10/lado", weight: "Plancha + rotación" } ],
+        note: "Circuito · 3 vueltas." },
+    ],
+  },
+  {
+    id: "a-jue", label: "JUE", fullName: "PUSH B", type: "EMPUJE", tag: "Hipertrofia",
+    subtitle: "Pecho · Hombro · Tríceps", accent: "#E879F9", bg: "#1a0020",
+    focus: "Segundo empuje, más volumen que el lunes. Descanso 90 seg. Hoy además series en pista.",
+    exercises: [
+      { id: "a-jue-press-plano", name: "Press Plano (máquina/mancuerna)", muscle: "Pecho", trackable: true,
+        repsPattern: [10, 10, 8, 6], offsets: [-8, -8, -4, 0], baseTop: 40, step: 2,
+        note: "Día pesado de pecho. Estiramiento máximo, empuja con el pectoral." },
+      { id: "a-jue-press-inf", name: "Press Declinado / Inferior", muscle: "Pecho inf.", trackable: true,
+        repsPattern: [10, 10, 8], offsets: [-8, -4, 0], baseTop: 45, step: 2.5,
+        note: "Recorrido completo, aprieta la parte baja del pecho." },
+      { id: "a-jue-elev-lat", name: "Elevaciones Laterales (máquina)", muscle: "Hombro lat.", trackable: true,
+        repsPattern: [12, 12, 10], offsets: [-3, -1, 0], baseTop: 14, step: 1,
+        note: "Da anchura de hombros. No hace falta ir muy pesado." },
+      { id: "a-jue-press-militar-db", name: "Press Militar Mancuerna", muscle: "Hombro", trackable: true,
+        repsPattern: [10, 10, 8], offsets: [-4, -2, 0], baseTop: 22, step: 2,
+        note: "Peso por mancuerna. No arquees la lumbar." },
+      { id: "a-jue-face-pull", name: "Face Pull Polea", muscle: "Hombro post.", trackable: true,
+        repsPattern: [12, 12, 10], offsets: [-4, -2, 0], baseTop: 20, step: 2.5,
+        note: "No lo saltes nunca: previene lesiones de hombro." },
+      { id: "a-jue-press-cerrado", name: "Press Cerrado (tríceps)", muscle: "Tríceps", trackable: true,
+        repsPattern: [10, 10, 10], offsets: [-6, -3, 0], baseTop: 40, step: 2.5,
+        note: "Codos cerca del cuerpo, empuja con el tríceps." },
+      { id: "a-jue-ext-unilat", name: "Extensión Polea Unilateral", muscle: "Tríceps", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-3, -1, 0], baseTop: 12, step: 1.25,
+        note: "Una mano cada vez, control total. Aprieta abajo." },
+    ],
+  },
+  {
+    id: "a-vie", label: "VIE", fullName: "PULL B", type: "TIRÓN", tag: "Hipertrofia",
+    subtitle: "Espalda · Bíceps · Antebrazo + Abs", accent: "#FBBF24", bg: "#1a1500",
+    focus: "Segundo tirón, foco en detalle y brazos. Descanso 90 seg. Abdominales al final.",
+    exercises: [
+      { id: "a-vie-remo-unilat", name: "Remo Unilateral Polea (cerrado)", muscle: "Espalda", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-5, -2, 0], baseTop: 25, step: 2.5,
+        note: "Un lado cada vez, lleva el codo hacia la cadera." },
+      { id: "a-vie-jalon", name: "Jalón Agarre Neutro", muscle: "Dorsal", trackable: true,
+        repsPattern: [10, 8, 6], offsets: [-10, -5, 0], baseTop: 65, step: 2.5,
+        note: "Tira con los codos hacia abajo, pausa 1 seg abajo." },
+      { id: "a-vie-remo-abierto", name: "Remo Abierto Polea", muscle: "Espalda alta", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-6, -3, 0], baseTop: 45, step: 2.5,
+        note: "Codos altos, aprieta la espalda alta y el deltoides posterior." },
+      { id: "a-vie-rack-pull", name: "Rack Pull (peso muerto parcial)", muscle: "Espalda", trackable: true,
+        repsPattern: [10, 8], offsets: [-15, 0], baseTop: 110, step: 5,
+        note: "Desde pines a la altura de la rodilla. Espalda neutra, empuja el suelo." },
+      { id: "a-vie-curl-scott", name: "Curl Bayesian Scott", muscle: "Bíceps", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-4, -2, 0], baseTop: 16, step: 1.25,
+        note: "Aislamiento en banco Scott. Sin trampa, no estires del todo abajo." },
+      { id: "a-vie-curl-bayesian", name: "Curl Bayesian", muscle: "Bíceps", trackable: true,
+        repsPattern: [10, 8, 8], offsets: [-3, -1, 0], baseTop: 14, step: 1.25,
+        note: "Estiramiento máximo con el codo detrás del cuerpo." },
+      { id: "a-vie-antebrazo", name: "Curl de Antebrazo (muñeca)", muscle: "Antebrazo", trackable: true,
+        repsPattern: [15, 12, 12], offsets: [-4, -2, 0], baseTop: 20, step: 2.5,
+        note: "Recorrido corto y controlado, sin balancear." },
+      { id: "a-vie-abs", name: "Abdominales · Circuito 3", muscle: "Core", trackable: false,
+        staticPyramid: [
+          { set: 1, reps: "12", weight: "Crunch" },
+          { set: 2, reps: "12", weight: "Rueda abdominal" },
+          { set: 3, reps: "12", weight: "Inferiores en banco" } ],
+        note: "Circuito · 3 vueltas." },
+    ],
+  },
+];
+
+/* ---------- BLOQUE 2: PLAN ÁVILA (4 días PPL + Upper) ---------- */
+var diasAvila = [
+  {
+    id: "v-push", label: "LUN", fullName: "PUSH", type: "EMPUJE", tag: "Fuerza",
+    subtitle: "Pecho · Hombro · Tríceps + Abs", accent: "#C8FF00", bg: "#0f1a00",
+    focus: "Con menos días de gimnasio, cada serie cuenta. Empuje completo, 2 min de descanso en compuestos.",
+    exercises: [
+      { id: "v-push-press-inc", name: "Press Inclinado Mancuerna", muscle: "Pecho sup.", trackable: true,
+        repsPattern: [10, 8, 8, 6], offsets: [-6, -4, -2, 0], baseTop: 34, step: 2,
+        note: "El pecho superior es lo que más se nota. Al completar las reps de la última serie → sube." },
+      { id: "v-push-press-militar", name: "Press Militar Barra", muscle: "Hombro", trackable: true,
+        repsPattern: [10, 8, 6], offsets: [-8, -4, 0], baseTop: 45, step: 2.5,
+        note: "De pie o sentado. Core firme, sin arquear la lumbar." },
+      { id: "v-push-aperturas", name: "Aperturas / Cruces", muscle: "Pecho", trackable: true,
+        repsPattern: [12, 12, 10], offsets: [-5, -3, 0], baseTop: 20, step: 2.5,
+        note: "Estiramiento amplio, aprieta en el centro 1 seg." },
+      { id: "v-push-elev-lat", name: "Elevaciones Laterales", muscle: "Hombro lat.", trackable: true,
+        repsPattern: [15, 12, 12], offsets: [-3, -1, 0], baseTop: 12, step: 1,
+        note: "Volumen para anchura de hombros." },
+      { id: "v-push-ext-triceps", name: "Extensión Tríceps Polea", muscle: "Tríceps", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-6, -2, 0], baseTop: 27, step: 2.5,
+        note: "Codos fijos, bloqueo total abajo." },
+      { id: "v-push-katana", name: "Press Francés / Katana", muscle: "Tríceps", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-5, -2, 0], baseTop: 25, step: 2.5,
+        note: "Baja controlado detrás de la cabeza, codos quietos." },
+      { id: "v-push-abs", name: "Abdominales · Circuito", muscle: "Core", trackable: false,
+        staticPyramid: [
+          { set: 1, reps: "12", weight: "Crunch" },
+          { set: 2, reps: "12", weight: "Rueda abdominal" },
+          { set: 3, reps: "12", weight: "Press Pallof" } ],
+        note: "Circuito · 3 vueltas. Uno de tus 2 días de abdominales." },
+    ],
+  },
+  {
+    id: "v-pull", label: "MAR", fullName: "PULL", type: "TIRÓN", tag: "Fuerza",
+    subtitle: "Espalda · Bíceps", accent: "#FF6B35", bg: "#1a0a00",
+    focus: "Tirón completo. Frecuencia 2 de espalda junto con el día Upper. Pausa apretando la espalda.",
+    exercises: [
+      { id: "v-pull-dominadas", name: "Dominadas / Jalón", muscle: "Espalda", trackable: false,
+        staticPyramid: [
+          { set: 1, reps: "al fallo", weight: "Corporal" },
+          { set: 2, reps: "10", weight: "Corporal" },
+          { set: 3, reps: "8", weight: "Corporal" } ],
+        note: "Si haces +12 limpias → añade lastre o pásalo a jalón pesado registrando el peso." },
+      { id: "v-pull-remo", name: "Remo con Barra", muscle: "Espalda", trackable: true,
+        repsPattern: [10, 8, 8], offsets: [-10, -5, 0], baseTop: 70, step: 2.5,
+        note: "Torso a 45°, lleva la barra al abdomen. Espalda neutra." },
+      { id: "v-pull-remo-abierto", name: "Remo Abierto / Face Pull", muscle: "Espalda alta", trackable: true,
+        repsPattern: [12, 12, 10], offsets: [-6, -3, 0], baseTop: 45, step: 2.5,
+        note: "Codos altos para la espalda alta y el deltoides posterior." },
+      { id: "v-pull-pullover", name: "Pull Over Polea", muscle: "Dorsal", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-5, -2, 0], baseTop: 30, step: 2.5,
+        note: "Brazos casi rectos, foco total en el dorsal." },
+      { id: "v-pull-curl", name: "Curl Bíceps Barra", muscle: "Bíceps", trackable: true,
+        repsPattern: [10, 10, 8], offsets: [-5, -2, 0], baseTop: 30, step: 1.25,
+        note: "Sin balanceo, contracción completa arriba." },
+      { id: "v-pull-martillo", name: "Curl Martillo", muscle: "Bíceps", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-4, -2, 0], baseTop: 16, step: 2,
+        note: "Braquial y antebrazo. Peso por mancuerna." },
+    ],
+  },
+  {
+    id: "v-legs", label: "JUE", fullName: "LEGS", type: "PIERNA", tag: "Completa",
+    subtitle: "Cuádriceps · Isquios · Glúteo · Gemelo + Abs", accent: "#38BDF8", bg: "#001a2a",
+    focus: "Único día de pierna a la semana: dale con todo. La carrera ayuda, pero la fuerza se entrena aquí. Abs al final.",
+    exercises: [
+      { id: "v-legs-sentadilla", name: "Sentadilla / Prensa", muscle: "Cuádriceps", trackable: true,
+        repsPattern: [10, 8, 6], offsets: [-15, -8, 0], baseTop: 100, step: 2.5,
+        note: "Técnica antes que ego. Profundidad completa. Al completar reps → sube." },
+      { id: "v-legs-rumano", name: "Peso Muerto Rumano", muscle: "Isquios", trackable: true,
+        repsPattern: [10, 8, 8], offsets: [-10, -5, 0], baseTop: 80, step: 2.5,
+        note: "Caderas atrás, barra pegada al cuerpo." },
+      { id: "v-legs-ext-cuad", name: "Extensión de Cuádriceps", muscle: "Cuádriceps", trackable: true,
+        repsPattern: [12, 12, 10], offsets: [-8, -4, 0], baseTop: 50, step: 2.5,
+        note: "Pausa 1 seg arriba." },
+      { id: "v-legs-curl-fem", name: "Curl Femoral", muscle: "Isquios", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-8, -4, 0], baseTop: 45, step: 2.5,
+        note: "Aprieta al final del recorrido." },
+      { id: "v-legs-hip", name: "Hip Thrust", muscle: "Glúteo", trackable: true,
+        repsPattern: [12, 10, 8], offsets: [-15, -8, 0], baseTop: 90, step: 5,
+        note: "Bloqueo de glúteo arriba 1 seg." },
+      { id: "v-legs-gemelos", name: "Gemelos de Pie", muscle: "Gemelos", trackable: true,
+        repsPattern: [15, 12, 12], offsets: [-15, -8, 0], baseTop: 70, step: 2.5,
+        note: "Pausa 2 seg abajo, rango completo." },
+      { id: "v-legs-abs", name: "Abdominales · Circuito", muscle: "Core", trackable: false,
+        staticPyramid: [
+          { set: 1, reps: "10", weight: "Crunch" },
+          { set: 2, reps: "10", weight: "Elevaciones inferiores" },
+          { set: 3, reps: "45 seg", weight: "Plancha" } ],
+        note: "Circuito · 3 vueltas. Tu segundo día de abdominales." },
+    ],
+  },
+  {
+    id: "v-upper", label: "VIE", fullName: "UPPER", type: "TORSO", tag: "Frecuencia 2",
+    subtitle: "Pecho · Espalda · Hombro · Brazos", accent: "#E879F9", bg: "#1a0020",
+    focus: "Segundo estímulo de torso: sube pecho, espalda y hombro a frecuencia 2. Descanso 90 seg.",
+    exercises: [
+      { id: "v-upper-press-inc", name: "Press Inclinado", muscle: "Pecho sup.", trackable: true,
+        repsPattern: [10, 8, 8], offsets: [-6, -3, 0], baseTop: 55, step: 2.5,
+        note: "Complementa el día de Push. Estiramiento máximo." },
+      { id: "v-upper-remo", name: "Remo Mancuerna", muscle: "Espalda", trackable: true,
+        repsPattern: [10, 8, 8], offsets: [-6, -3, 0], baseTop: 32, step: 2,
+        note: "Pausa 1 seg apretando el dorsal." },
+      { id: "v-upper-press-db", name: "Press Militar Mancuerna", muscle: "Hombro", trackable: true,
+        repsPattern: [10, 10, 8], offsets: [-4, -2, 0], baseTop: 22, step: 2,
+        note: "Recorrido completo, sin arquear." },
+      { id: "v-upper-jalon", name: "Jalón Agarre Neutro", muscle: "Dorsal", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-8, -4, 0], baseTop: 60, step: 2.5,
+        note: "Tira con los codos, no con las manos." },
+      { id: "v-upper-elev-lat", name: "Elevaciones Laterales", muscle: "Hombro lat.", trackable: true,
+        repsPattern: [15, 12, 12], offsets: [-3, -1, 0], baseTop: 12, step: 1,
+        note: "Más volumen para hombros: da el look ancho." },
+      { id: "v-upper-brazos", name: "Superserie Bíceps + Tríceps", muscle: "Bíceps", trackable: true,
+        repsPattern: [12, 10, 10], offsets: [-4, -2, 0], baseTop: 14, step: 1.25,
+        note: "Curl + extensión sin descanso entre medias. Bombeo final." },
+    ],
+  },
+];
+
+/* ---------- DEFINICIÓN DE LOS DOS BLOQUES ---------- */
+var blocks = [
+  {
+    id: "actual", name: "Plan actual", tabsub: "5 días · ahora", accent: "#C8FF00",
+    period: "Jul → mediados Sep 2026",
+    goal: "Recomposición: ganar músculo mientras sigues quemando grasa. Frecuencia 2 en push y pull, 1 en pierna, con 3 días de carrera. Objetivo: verte algo más grande pero definiendo. Sube peso poco a poco, sin sacrificar la técnica.",
+    run: "3 días de carrera. Martes: continua suave 7–10 km. Jueves: series en pista. Sábado: variado (cuestas o series de 1–2 km ×3-4 a 4:00–4:15/km).",
+    rule: "Estás en recomposición: mantenimiento o déficit ligero y mucha proteína. Sube peso cuando completes las reps de la última serie; si no, repite el mismo. El músculo se construye poco a poco.",
+    days: diasActual,
+    week: [
+      { label: "L", id: "a-lun", active: true },
+      { label: "M", id: "a-mar", active: true },
+      { label: "X", id: "a-mie", active: true },
+      { label: "J", id: "a-jue", active: true },
+      { label: "V", id: "a-vie", active: true },
+      { label: "S", active: false },
+      { label: "D", active: false },
+    ],
+    overview: [
+      { day: "Lunes", type: "Push A", tag: "+ Abdominales", accent: "#C8FF00" },
+      { day: "Martes", type: "Pull A", tag: "+ Carrera 7-10 km", accent: "#FF6B35" },
+      { day: "Miércoles", type: "Legs", tag: "+ Abdominales", accent: "#38BDF8" },
+      { day: "Jueves", type: "Push B", tag: "+ Series en pista", accent: "#E879F9" },
+      { day: "Viernes", type: "Pull B", tag: "+ Abdominales", accent: "#FBBF24" },
+      { day: "Sábado", type: "Carrera", tag: "Variada / cuestas", accent: "#333" },
+      { day: "Domingo", type: "Descanso", tag: "Recuperación", accent: "#222" },
+    ],
+  },
+  {
+    id: "avila", name: "Plan Ávila", tabsub: "4 días · academia", accent: "#38BDF8",
+    period: "Desde mediados Sep 2026",
+    goal: "Menos volumen por la carga de la academia: bajas de 5 a 4 días de gimnasio (Push · Pull · Legs · Upper) manteniendo frecuencia 2 en el torso. Mantén 2–3 días de carrera (mínimo 2). El objetivo es no perder lo ganado y seguir progresando donde puedas.",
+    run: "2–3 días (mínimo 2). Ideal: 1 suave de fondo + 1 de calidad (series). El día largo, el sábado, si el cuerpo lo permite.",
+    rule: "Menos volumen, misma intensidad. El objetivo es NO perder lo ganado y seguir progresando en los básicos. No te saltes la pierna aunque corras: la carrera no sustituye la fuerza.",
+    days: diasAvila,
+    week: [
+      { label: "L", id: "v-push", active: true },
+      { label: "M", id: "v-pull", active: true },
+      { label: "X", active: false },
+      { label: "J", id: "v-legs", active: true },
+      { label: "V", id: "v-upper", active: true },
+      { label: "S", active: false },
+      { label: "D", active: false },
+    ],
+    overview: [
+      { day: "Lunes", type: "Push", tag: "+ Abdominales", accent: "#C8FF00" },
+      { day: "Martes", type: "Pull", tag: "+ Carrera", accent: "#FF6B35" },
+      { day: "Miércoles", type: "Carrera", tag: "Suave / descanso", accent: "#333" },
+      { day: "Jueves", type: "Legs", tag: "+ Abdominales", accent: "#38BDF8" },
+      { day: "Viernes", type: "Upper", tag: "Torso frecuencia 2", accent: "#E879F9" },
+      { day: "Sábado", type: "Carrera", tag: "Larga / opcional", accent: "#333" },
+      { day: "Domingo", type: "Descanso", tag: "Recuperación", accent: "#222" },
+    ],
+  },
+];
+
+var CHECK_SVG = '<svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var CHEVRON_SVG = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4.5L6 8L10 4.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+var STORAGE_KEY = "gymAmigoProgresoV1";
+var CUTOVER = "2026-09-15"; // mediados de septiembre: cambio de bloque
+
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function round(n) { return Math.round(n * 100) / 100; }
+
+function buildDefaultProgress() {
+  var exercises = {};
+  blocks.forEach(function (b) {
+    b.days.forEach(function (day) {
+      day.exercises.forEach(function (ex) {
+        if (ex.trackable) exercises[ex.id] = { top: ex.baseTop, history: [] };
+      });
+    });
+  });
+  return { exercises: exercises };
+}
+
+function loadProgress() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      var def = buildDefaultProgress();
+      parsed.exercises = Object.assign({}, def.exercises, parsed.exercises || {});
+      return parsed;
+    }
+  } catch (e) { console.error("No se pudo leer el progreso guardado", e); }
+  return buildDefaultProgress();
+}
+
+function saveProgress(p) {
+  progress = p;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
+  catch (e) { console.error("No se pudo guardar el progreso", e); }
+}
+
+function getPyramid(ex, prog) {
+  if (!ex.trackable) return ex.staticPyramid;
+  var entry = prog.exercises[ex.id];
+  var top = entry ? entry.top : ex.baseTop;
+  return ex.repsPattern.map(function (reps, i) {
+    return { set: i + 1, reps: reps, weight: round(top + ex.offsets[i]) + " kg" };
+  });
+}
+
+function findExercise(exId) {
+  for (var b = 0; b < blocks.length; b++) {
+    for (var d = 0; d < blocks[b].days.length; d++) {
+      for (var e = 0; e < blocks[b].days[d].exercises.length; e++) {
+        if (blocks[b].days[d].exercises[e].id === exId) return blocks[b].days[d].exercises[e];
+      }
+    }
+  }
+  return null;
+}
+
+/* ---------------- STATE ---------------- */
+var activeBlock = todayISO() < CUTOVER ? 0 : 1;
+var activeDay = blocks[activeBlock].days[0].id;
+var checked = {};
+var expanded = {};
+var progress = loadProgress();
+var editingId = null;
+var toastMsg = "";
+var toastTimeout = null;
+var planOpen = false;
+var confirmReset = false;
+var confirmResetTimeout = null;
+
+/* ---------------- ACTIONS ---------------- */
+function setActiveBlock(i) {
+  if (i === activeBlock) return;
+  activeBlock = i;
+  activeDay = blocks[i].days[0].id;
+  checked = {}; expanded = {}; editingId = null;
+  render();
+}
+function setActiveDay(id) { activeDay = id; expanded = {}; editingId = null; render(); }
+function toggleCheck(i) { var k = activeDay + "-" + i; checked[k] = !checked[k]; render(); }
+function toggleExpand(i) { var k = activeDay + "-" + i; expanded[k] = !expanded[k]; render(); }
+function togglePlan() { planOpen = !planOpen; render(); }
+function openLogger(exId) { editingId = exId; render(); }
+function cancelLogger() { editingId = null; render(); }
+
+function showToast(msg) {
+  toastMsg = msg;
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(function () { toastMsg = ""; render(); }, 3000);
+  render();
+}
+
+function saveLog(exId) {
+  var ex = findExercise(exId);
+  if (!ex) return;
+  var wEl = document.getElementById("inp-weight");
+  var rEl = document.getElementById("inp-reps");
+  var w = parseFloat(String(wEl.value).replace(",", "."));
+  var r = parseInt(rEl.value, 10);
+  if (isNaN(w) || isNaN(r)) { showToast("Revisa los números introducidos."); return; }
+  var targetReps = ex.repsPattern[ex.repsPattern.length - 1];
+  var reached = r >= targetReps;
+  var newTop = reached ? round(w + ex.step) : round(w);
+  var prevEntry = progress.exercises[ex.id] || { top: ex.baseTop, history: [] };
+  var newHistory = (prevEntry.history || []).concat([{ date: todayISO(), weight: w, reps: r }]).slice(-10);
+  progress.exercises[ex.id] = { top: newTop, history: newHistory };
+  saveProgress(progress);
+  editingId = null;
+  showToast(reached ? "Guardado ✓ Próxima vez: " + newTop + " kg" : "Guardado ✓ Repetimos " + newTop + " kg la próxima");
+}
+
+function handleReset() {
+  if (!confirmReset) {
+    confirmReset = true;
+    clearTimeout(confirmResetTimeout);
+    confirmResetTimeout = setTimeout(function () { confirmReset = false; render(); }, 4000);
+    render();
+    return;
+  }
+  saveProgress(buildDefaultProgress());
+  confirmReset = false;
+  showToast("Progreso reiniciado.");
+}
+
+/* ---------------- RENDER ---------------- */
+function render() {
+  var app = document.getElementById("app");
+  var block = blocks[activeBlock];
+  var accent = block.accent;
+  var day = block.days.filter(function (d) { return d.id === activeDay; })[0] || block.days[0];
+  var done = day.exercises.filter(function (_, i) { return checked[activeDay + "-" + i]; }).length;
+  var total = day.exercises.length;
+  var pct = Math.round((done / total) * 100);
+
+  document.body.style.background = day.bg;
+
+  var html = "";
+  if (toastMsg) html += '<div class="toast">' + toastMsg + "</div>";
+  html += '<div class="wrap">';
+
+  /* header */
+  html += '<div class="header">' +
+    '<div class="glow" style="background:' + day.accent + '"></div>' +
+    '<div class="eyebrow">GANAR MÚSCULO · QUEMAR GRASA</div>' +
+    '<div class="title">PUSH·PULL<br><span style="color:' + accent + '">LEGS</span></div>' +
+    '<div class="subtitle">' + block.period + " · " + block.days.length + " días de gimnasio</div>";
+
+  /* block switcher */
+  html += '<div class="blockswitch">';
+  blocks.forEach(function (b, bi) {
+    var on = bi === activeBlock;
+    html += '<div class="blockpill" style="background:' + (on ? b.accent + "22" : "rgba(255,255,255,0.04)") +
+      ";border:1px solid " + (on ? b.accent + "66" : "rgba(255,255,255,0.08)") + '" onclick="setActiveBlock(' + bi + ')">' +
+      '<div class="bp-name" style="color:' + (on ? b.accent : "rgba(255,255,255,0.6)") + '">' + b.name + "</div>" +
+      '<div class="bp-sub" style="color:rgba(255,255,255,0.4)">' + b.tabsub + "</div>" +
+    "</div>";
+  });
+  html += "</div>";
+
+  /* goal pill */
+  html += '<div class="phasepill" style="background:' + accent + "15;border:1px solid " + accent + '40" onclick="togglePlan()">' +
+    '<span class="dot" style="background:' + accent + '"></span>' +
+    '<span style="font-size:12px;font-weight:700;color:' + accent + '">Objetivo y carrera</span>' +
+    '<span class="chevron' + (planOpen ? " open" : "") + '">' + CHEVRON_SVG + "</span>" +
+  "</div>";
+
+  if (planOpen) {
+    html += '<div class="planpanel" style="border:1px solid ' + accent + '30">' +
+      '<div class="plandesc">' + block.goal + "</div>" +
+      '<div class="planlabel">CARRERA</div>' +
+      '<div class="runbox"><div class="runtext">' + block.run + "</div></div>" +
+      '<div class="planlabel">TU PLAN EN 2 BLOQUES</div>';
+    blocks.forEach(function (b, bi) {
+      var isCur = bi === activeBlock;
+      html += '<div class="phaserow" style="opacity:' + (isCur ? 1 : 0.55) + '">' +
+        '<div class="phaseleft">' +
+          '<span class="dot" style="background:' + b.accent + '"></span>' +
+          '<span class="phasename' + (isCur ? " current" : "") + '">' + b.name + "</span>" +
+          (isCur ? '<span class="heretag" style="color:' + b.accent + '">ACTIVO</span>' : "") +
+        "</div>" +
+        '<span class="phasedate">' + b.period + "</span>" +
+      "</div>";
+    });
+    html += "</div>";
+  }
+
+  /* weekpills */
+  html += '<div class="weekpills">';
+  block.week.forEach(function (w) {
+    var isActive = w.id === activeDay;
+    var bg = isActive ? accent : (w.active ? "rgba(255,255,255,0.07)" : "transparent");
+    var color = isActive ? "#000" : (w.active ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.15)");
+    var border = isActive ? "none" : (w.active ? "1px solid rgba(255,255,255,0.1)" : "none");
+    var cursor = w.active ? "pointer" : "default";
+    var click = (w.active && w.id) ? ' onclick="setActiveDay(\'' + w.id + '\')"' : "";
+    html += '<div class="daybtn" style="background:' + bg + ";color:" + color + ";border:" + border + ";cursor:" + cursor + '"' + click + ">" + w.label + "</div>";
+  });
+  html += "</div></div>";
+
+  /* day card */
+  html += '<div class="daycard-wrap"><div class="daycard" style="border:1px solid ' + day.accent + '30">' +
+    '<div class="daycard-top"><div>' +
+      '<div class="typebadge" style="background:' + day.accent + "20;border:1px solid " + day.accent + '40">' +
+        '<span class="t1" style="color:' + day.accent + '">' + day.type + "</span>" +
+        '<span class="sep" style="background:' + day.accent + '"></span>' +
+        '<span class="t2" style="color:' + day.accent + '">' + day.tag.toUpperCase() + "</span>" +
+      "</div>" +
+      '<div class="dayname">' + day.fullName + "</div>" +
+      '<div class="daysub">' + day.subtitle + "</div>" +
+    "</div>" +
+    '<div class="pctbox">' +
+      '<div class="pctnum" style="color:' + ((done === total && done > 0) ? day.accent : "rgba(255,255,255,0.2)") + '">' + pct + "%</div>" +
+      '<div class="pctlabel">' + done + "/" + total + " HECHOS</div>" +
+    "</div></div>" +
+    '<div class="barbg"><div class="barfill" style="width:' + pct + "%;background:linear-gradient(90deg, " + day.accent + "aa, " + day.accent + ')"></div></div>' +
+    '<div class="focus">' + day.focus + "</div>" +
+  "</div></div>";
+
+  /* exercises */
+  html += '<div class="exlist">';
+  day.exercises.forEach(function (ex, i) {
+    var key = activeDay + "-" + i;
+    var isDone = checked[key];
+    var isOpen = expanded[key];
+    var mc = muscleColors[ex.muscle] || "#888";
+    var pyramid = getPyramid(ex, progress);
+    var entry = ex.trackable ? progress.exercises[ex.id] : null;
+    var lastLog = entry && entry.history.length ? entry.history[entry.history.length - 1] : null;
+    var isEditing = editingId === ex.id;
+
+    html += '<div class="excard" style="background:' + (isDone ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)") +
+      ";border:1px solid " + (isDone ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.09)") + ";opacity:" + (isDone ? 0.45 : 1) + '">' +
+      '<div class="exhead">' +
+        '<div class="chk" style="border:2px solid ' + (isDone ? day.accent : "rgba(255,255,255,0.15)") + ";background:" + (isDone ? day.accent : "transparent") + '" onclick="toggleCheck(' + i + ')">' + (isDone ? CHECK_SVG : "") + "</div>" +
+        '<div class="exinfo" onclick="toggleExpand(' + i + ')">' +
+          '<div class="exname-row">' +
+            '<span class="exname" style="color:' + (isDone ? "rgba(255,255,255,0.3)" : "#fff") + ";text-decoration:" + (isDone ? "line-through" : "none") + '">' + ex.name + "</span>" +
+            '<span class="muscletag" style="background:' + mc + "20;color:" + mc + '">' + ex.muscle.toUpperCase() + "</span>" +
+          "</div>" +
+          '<div class="exmeta">' + pyramid.length + " series · " + pyramid[0].reps + "→" + pyramid[pyramid.length - 1].reps + " reps" +
+            (lastLog ? " · Últ: " + lastLog.weight + " kg×" + lastLog.reps : "") +
+          "</div>" +
+        "</div>" +
+        '<div class="expbtn" style="transform:' + (isOpen ? "rotate(180deg)" : "rotate(0deg)") + '" onclick="toggleExpand(' + i + ')">' + CHEVRON_SVG + "</div>" +
+      "</div>";
+
+    if (isOpen) {
+      html += '<div class="pyramid"><div class="pyhead"><span>SER</span><span>REPS</span><span>PESO / MOV.</span><span style="text-align:right">INT.</span></div>';
+      pyramid.forEach(function (p, pi) {
+        var intensity = Math.round(((pi + 1) / pyramid.length) * 100);
+        var denom = (pyramid.length - 1) || 1;
+        var opSet = 0.5 + (pi / denom) * 0.5;
+        var opInt = 0.4 + (pi / denom) * 0.6;
+        html += '<div class="pyrow">' +
+          '<span class="pyset" style="color:' + day.accent + ";opacity:" + opSet + '">' + p.set + "</span>" +
+          '<span class="pyreps">' + p.reps + "</span>" +
+          '<span class="pyweight">' + p.weight + "</span>" +
+          '<div class="pyint"><span style="color:' + day.accent + ";opacity:" + opInt + '">' + (ex.trackable ? intensity + "%" : "—") + "</span></div>" +
+        "</div>";
+      });
+      html += '<div class="tip">' + ex.note + "</div>";
+
+      if (ex.trackable) {
+        html += '<div class="logwrap">';
+        if (!isEditing) {
+          html += '<div class="logbtn" style="background:' + day.accent + "15;border:1px solid " + day.accent + "35;color:" + day.accent + '" onclick="openLogger(\'' + ex.id + '\')">✎ Registrar lo que hiciste hoy</div>';
+        } else {
+          html += '<div class="logform-row">' +
+            '<div class="logform-col"><div class="logform-label">PESO (KG)</div>' +
+              '<input id="inp-weight" class="numin" type="number" inputmode="decimal" step="0.5" value="' + entry.top + '"></div>' +
+            '<div class="logform-col"><div class="logform-label">REPS EN LA ÚLTIMA SERIE</div>' +
+              '<input id="inp-reps" class="numin" type="number" inputmode="numeric" step="1" value="' + ex.repsPattern[ex.repsPattern.length - 1] + '"></div>' +
+          "</div>" +
+          '<div class="logform-actions">' +
+            '<div class="logform-btn" style="background:' + day.accent + ';color:#000" onclick="saveLog(\'' + ex.id + '\')">Guardar</div>' +
+            '<div class="logform-btn" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6)" onclick="cancelLogger()">Cancelar</div>' +
+          "</div>";
+        }
+        html += "</div>";
+      }
+      html += "</div>";
+    }
+    html += "</div>";
+  });
+  html += "</div>";
+
+  /* weekly overview */
+  html += '<div class="overview"><div class="overview-title">VISIÓN SEMANAL · ' + block.name.toUpperCase() + "</div>";
+  block.overview.forEach(function (row) {
+    var dim = row.accent === "#333" || row.accent === "#222";
+    html += '<div class="overow"><div class="overleft"><span class="overdot" style="background:' + row.accent + '"></span>' +
+      '<span class="overday" style="color:' + (dim ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.8)") + '">' + row.day + "</span></div>" +
+      '<div><span class="overtype" style="color:' + (dim ? "rgba(255,255,255,0.3)" : row.accent) + '">' + row.type + "</span>" +
+      '<span class="overtag">' + row.tag + "</span></div></div>";
+  });
+  html += "</div>";
+
+  /* progression rule */
+  html += '<div class="rulebox" style="background:' + accent + "10;border:1px solid " + accent + '25">' +
+    '<div class="rulelabel" style="color:' + accent + '">REGLA DE PROGRESIÓN · ' + block.name.toUpperCase() + "</div>" +
+    '<div class="ruletext">' + block.rule + "</div>" +
+  "</div>";
+
+  /* footer */
+  html += '<div class="footer"><div class="resetlink" style="color:' + (confirmReset ? "#FF6B35" : "rgba(255,255,255,0.2)") + '" onclick="handleReset()">' +
+    (confirmReset ? "¿Seguro? Toca de nuevo para reiniciar" : "Reiniciar progreso guardado") +
+  "</div></div>";
+
+  html += "</div>";
+  app.innerHTML = html;
+}
+
+render();
+</script>
+</body>
+</html>

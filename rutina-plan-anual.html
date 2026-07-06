@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>3 Upper · 1 Pierna — Plan Anual</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: #0a0a0a; }
+  body {
+    font-family: 'Syne', -apple-system, sans-serif; color: #f0f0f0;
+    transition: background 0.5s ease; padding-bottom: env(safe-area-inset-bottom);
+  }
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-thumb { background: #333; }
+
+  .wrap { min-height: 100vh; }
+  .glow { position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; border-radius: 50%; opacity: 0.08; filter: blur(40px); pointer-events: none; transition: background 0.5s; }
+  .header { padding: 28px 20px 0; position: relative; overflow: hidden; }
+  .eyebrow { font-size: 9px; letter-spacing: 5px; color: rgba(255,255,255,0.25); margin-bottom: 10px; font-weight: 600; }
+  .title { font-size: 38px; font-weight: 800; letter-spacing: -1.5px; line-height: 1; color: #fff; }
+  .subtitle { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 6px; font-weight: 500; }
+
+  .phasepill { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 8px 12px; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .chevron { display: inline-flex; transition: transform 0.2s; }
+  .chevron.open { transform: rotate(180deg); }
+  .planpanel { margin-top: 12px; background: rgba(255,255,255,0.03); border-radius: 14px; padding: 16px; }
+  .plandesc { font-size: 13px; color: rgba(255,255,255,0.7); line-height: 1.6; margin-bottom: 14px; }
+  .planlabel { font-size: 9px; font-weight: 700; letter-spacing: 2px; color: rgba(255,255,255,0.25); margin-bottom: 8px; }
+  .phaserow { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .phaserow:last-child { border-bottom: none; }
+  .phaseleft { display: flex; align-items: center; gap: 8px; }
+  .phasename { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); }
+  .phasename.current { font-weight: 800; color: #fff; }
+  .heretag { font-size: 8px; font-weight: 700; letter-spacing: 1px; }
+  .phasedate { font-size: 10px; color: rgba(255,255,255,0.3); white-space: nowrap; }
+
+  .weekpills { display: flex; gap: 7px; margin-top: 20px; }
+  .daybtn { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; transition: all 0.3s; }
+
+  .daycard-wrap { margin: 16px 20px 0; }
+  .daycard { background: rgba(255,255,255,0.04); border-radius: 16px; padding: 16px; transition: border-color 0.4s; }
+  .daycard-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .typebadge { display: inline-flex; align-items: center; gap: 6px; border-radius: 6px; padding: 3px 8px; margin-bottom: 8px; }
+  .typebadge .t1 { font-size: 9px; font-weight: 700; letter-spacing: 2px; }
+  .typebadge .sep { width: 3px; height: 3px; border-radius: 50%; display: inline-block; }
+  .typebadge .t2 { font-size: 9px; font-weight: 600; opacity: 0.7; }
+  .dayname { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+  .daysub { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 3px; }
+  .pctbox { text-align: right; }
+  .pctnum { font-size: 36px; font-weight: 800; line-height: 1; transition: color 0.3s; }
+  .pctlabel { font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,0.25); margin-top: 2px; }
+  .barbg { height: 3px; background: rgba(255,255,255,0.08); border-radius: 3px; margin-top: 14px; overflow: hidden; }
+  .barfill { height: 100%; border-radius: 3px; transition: width 0.5s cubic-bezier(.4,0,.2,1); }
+  .focus { margin-top: 12px; font-size: 12px; color: rgba(255,255,255,0.45); line-height: 1.6; font-weight: 500; }
+
+  .exlist { padding: 12px 20px; }
+  .excard { margin-bottom: 8px; border-radius: 14px; overflow: hidden; transition: all 0.25s ease; }
+  .exhead { padding: 13px 14px; display: flex; gap: 12px; align-items: center; }
+  .chk { width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; cursor: pointer; }
+  .exinfo { flex: 1; min-width: 0; cursor: pointer; }
+  .exname-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .exname { font-size: 14px; font-weight: 700; }
+  .muscletag { font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 1px; white-space: nowrap; }
+  .exmeta { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px; font-weight: 500; }
+  .expbtn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: rgba(255,255,255,0.06); transition: transform 0.25s ease; flex-shrink: 0; cursor: pointer; }
+
+  .pyramid { border-top: 1px solid rgba(255,255,255,0.06); }
+  .pyhead { display: grid; grid-template-columns: 40px 70px 1fr 60px; padding: 7px 14px; background: rgba(0,0,0,0.2); font-size: 8px; font-weight: 700; letter-spacing: 2px; color: rgba(255,255,255,0.2); }
+  .pyrow { display: grid; grid-template-columns: 40px 70px 1fr 60px; padding: 9px 14px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .pyrow:last-of-type { border-bottom: none; }
+  .pyset { font-size: 16px; font-weight: 800; }
+  .pyreps { font-size: 15px; font-weight: 700; color: #fff; }
+  .pyweight { font-size: 13px; color: rgba(255,255,255,0.5); font-weight: 500; }
+  .pyint { text-align: right; font-size: 9px; font-weight: 700; }
+  .tip { padding: 10px 14px; background: rgba(0,0,0,0.15); border-top: 1px solid rgba(255,255,255,0.05); font-size: 11px; color: rgba(255,255,255,0.35); line-height: 1.6; font-style: italic; }
+
+  .logwrap { padding: 12px 14px; border-top: 1px solid rgba(255,255,255,0.05); }
+  .logbtn { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .logform-row { display: flex; gap: 10px; margin-bottom: 10px; }
+  .logform-col { flex: 1; }
+  .logform-label { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: rgba(255,255,255,0.35); margin-bottom: 5px; }
+  .numin { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 8px; padding: 8px 10px; width: 100%; }
+  .numin:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+  .logform-actions { display: flex; gap: 8px; }
+  .logform-btn { flex: 1; text-align: center; padding: 10px; border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+
+  .overview { margin: 4px 20px 16px; padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; }
+  .overview-title { font-size: 9px; font-weight: 700; letter-spacing: 3px; color: rgba(255,255,255,0.25); margin-bottom: 12px; }
+  .overow { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .overow:last-child { border-bottom: none; }
+  .overleft { display: flex; gap: 10px; align-items: center; }
+  .overdot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .overday { font-size: 13px; font-weight: 600; }
+  .overtype { font-size: 12px; font-weight: 700; }
+  .overtag { font-size: 11px; color: rgba(255,255,255,0.25); margin-left: 6px; }
+
+  .rulebox { margin: 0 20px 16px; padding: 14px; border-radius: 14px; transition: all 0.4s; }
+  .rulelabel { font-size: 9px; font-weight: 700; letter-spacing: 3px; opacity: 0.7; margin-bottom: 8px; }
+  .ruletext { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.6; font-weight: 500; }
+
+  .footer { margin: 0 20px 40px; text-align: center; }
+  .resetlink { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 1px; cursor: pointer; padding: 8px; }
+
+  .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 50; background: #111; color: #fff; font-size: 12px; font-weight: 700; padding: 9px 16px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); white-space: nowrap; }
+  .loading { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); font-size: 13px; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">CARGANDO…</div></div>
+
+<script>
+/* ============================================================
+   PLAN ANUAL — 6 Jul 2026 → 30 Jun 2027
+   8 bloques de ~6 semanas (fuerza / hipertrofia) con descargas,
+   respetando verano y navidad. La estructura semanal no cambia
+   en todo el año — lo que cambia es la intensidad y el mensaje.
+   ============================================================ */
+var phases = [
+  { id: 1, name: "Verano activo", tag: "Mantenimiento", start: "2026-07-06", end: "2026-08-31", color: "#FDBA74",
+    desc: "Sin presión de progresar. Mantén los pesos que ya tienes, cuida la técnica y entrena cuando puedas. Si el 4º día no entra por vacaciones o calor, no pasa nada — el objetivo aquí es no perder el hábito." },
+  { id: 2, name: "Bloque de fuerza I", tag: "Progresión", start: "2026-09-01", end: "2026-10-12", color: "#C8FF00",
+    desc: "Vuelta a la rutina completa. Cada vez que completes todas las reps de la última serie, sube el peso al registrar. Sin prisa: 2,5 kg es 2,5 kg." },
+  { id: 3, name: "Descarga", tag: "Recuperación", start: "2026-10-13", end: "2026-10-19", color: "#94A3B8",
+    desc: "Semana ligera. Baja el peso un 10% aprox. o quita una serie por ejercicio. El cuerpo mejora cuando descansa, no solo cuando entrena." },
+  { id: 4, name: "Hipertrofia · Otoño", tag: "Volumen", start: "2026-10-20", end: "2026-11-30", color: "#FF6B35",
+    desc: "Más reps, descansos algo más cortos. Prioriza sentir el músculo trabajar por encima del número que mueves." },
+  { id: 5, name: "Descarga", tag: "Recuperación", start: "2026-12-01", end: "2026-12-07", color: "#94A3B8",
+    desc: "Otra semana de bajar intensidad antes de las fiestas. Llega a diciembre descansado, no quemado." },
+  { id: 6, name: "Navidad", tag: "Mantenimiento", start: "2026-12-08", end: "2027-01-04", color: "#38BDF8",
+    desc: "Fiestas, viajes, comidas. Entrena cuando puedas con lo que tengas a mano. Nadie progresa en diciembre y está perfectamente bien." },
+  { id: 7, name: "Bloque de fuerza II", tag: "Progresión", start: "2027-01-05", end: "2027-02-15", color: "#C8FF00",
+    desc: "Nuevo ciclo de fuerza, ya con los pesos que mejoraste desde septiembre. Misma regla: completa las reps → sube peso." },
+  { id: 8, name: "Descarga", tag: "Recuperación", start: "2027-02-16", end: "2027-02-22", color: "#94A3B8",
+    desc: "Semana ligera. Baja el peso un 10% aprox. o quita una serie por ejercicio." },
+  { id: 9, name: "Hipertrofia · Primavera", tag: "Volumen", start: "2027-02-23", end: "2027-04-05", color: "#FF6B35",
+    desc: "Bloque de volumen. Buena técnica, buen descanso entre series, sin ir al fallo constantemente." },
+  { id: 10, name: "Descarga", tag: "Recuperación", start: "2027-04-06", end: "2027-04-12", color: "#94A3B8",
+    desc: "Semana ligera antes del último empujón de fuerza del año." },
+  { id: 11, name: "Bloque de fuerza III", tag: "Progresión", start: "2027-04-13", end: "2027-05-24", color: "#C8FF00",
+    desc: "Último bloque de progresión antes del verano. Aquí es donde más se nota el año de trabajo." },
+  { id: 12, name: "Cierre de año", tag: "Test de progreso", start: "2027-05-25", end: "2027-06-30", color: "#E879F9",
+    desc: "Un año después: prueba con calma tus nuevos máximos en sentadilla, press banca, press militar y peso muerto rumano. Compara con julio de 2026 y date cuenta de lo lejos que has llegado." },
+];
+
+function getPhase(dateISO) {
+  var t = new Date(dateISO + "T00:00:00").getTime();
+  var first = new Date(phases[0].start + "T00:00:00").getTime();
+  if (t < first) return phases[0];
+  for (var i = 0; i < phases.length; i++) {
+    var p = phases[i];
+    var s = new Date(p.start + "T00:00:00").getTime();
+    var e = new Date(p.end + "T23:59:59").getTime();
+    if (t >= s && t <= e) return p;
+  }
+  return phases[phases.length - 1];
+}
+function getWeekNumber(dateISO) {
+  var start = new Date(phases[0].start + "T00:00:00").getTime();
+  var t = new Date(dateISO + "T00:00:00").getTime();
+  var diff = Math.floor((t - start) / 86400000);
+  return Math.min(52, Math.max(1, Math.floor(diff / 7) + 1));
+}
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function formatDateEs(iso) {
+  var d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
+}
+function round(n) { return Math.round(n * 100) / 100; }
+
+/* ============================================================
+   RUTINA — 3 upper + 1 pierna. Cada ejercicio "trackable" lleva
+   su propia progresión: offsets = diferencia en kg de cada serie
+   respecto a la última (la que registras cada sesión).
+   ============================================================ */
+var days = [
+  {
+    id: "lunes", label: "LUN", fullName: "LUNES", type: "UPPER A", tag: "Fuerza",
+    subtitle: "Pecho · Espalda · Hombro", accent: "#C8FF00", bg: "#0f1a00",
+    focus: "Día de fuerza. Descansa 2–3 min entre series de compuestos. Técnica antes que ego.",
+    exercises: [
+      { id: "lun-press-banca", name: "Press Banca Barra", muscle: "Pecho", trackable: true,
+        repsPattern: [12, 8, 6, 4], offsets: [-15, -8, -3, 0], baseTop: 65, step: 2.5,
+        note: "Al completar las 4 reps de la última serie → sube 2,5 kg la próxima vez." },
+      { id: "lun-jalon-pecho", name: "Jalón al Pecho (agarre neutro)", muscle: "Espalda", trackable: true,
+        repsPattern: [12, 8, 6, 4], offsets: [-15, -9, -4, 0], baseTop: 67, step: 2.5,
+        note: "Tira con codos hacia las caderas. Pausa 1 seg abajo." },
+      { id: "lun-press-militar", name: "Press Militar Barra (de pie)", muscle: "Hombro", trackable: true,
+        repsPattern: [10, 8, 6, 4], offsets: [-12, -7, -2, 0], baseTop: 47, step: 2.5,
+        note: "Core apretado, sin arquear la espalda. De pie = más activación." },
+      { id: "lun-remo-maquina", name: "Remo en Máquina (pecho apoyado)", muscle: "Espalda", trackable: true,
+        repsPattern: [12, 8, 6], offsets: [-17, -7, 0], baseTop: 77, step: 2.5,
+        note: "Codos cerca del cuerpo. Pausa 1 seg apretando la espalda." },
+      { id: "lun-curl-ez", name: "Curl Barra EZ", muscle: "Bíceps", trackable: true,
+        repsPattern: [12, 10, 8], offsets: [-8, -3, 0], baseTop: 33, step: 1.25,
+        note: "Sin balanceo. Contracción total arriba. Sube el mínimo que permita tu material." },
+      { id: "lun-fondos", name: "Fondos en Paralelas", muscle: "Tríceps", trackable: false,
+        staticPyramid: [
+          { set: 1, reps: "al fallo", weight: "Corporal" },
+          { set: 2, reps: "al fallo", weight: "Corporal" },
+          { set: 3, reps: "al fallo", weight: "Corporal" } ],
+        note: "Torso vertical = tríceps. Cuando llegues a 15 reps limpias en las 3 series → añade lastre." },
+    ],
+  },
+  {
+    id: "martes", label: "MAR", fullName: "MARTES", type: "UPPER B", tag: "Hipertrofia",
+    subtitle: "Pecho · Espalda · Hombro", accent: "#FF6B35", bg: "#1a0a00",
+    focus: "Más reps que el lunes, mismo músculo. Descanso 90 seg. Aquí crece el músculo.",
+    exercises: [
+      { id: "mar-press-inclinado", name: "Press Inclinado Mancuerna", muscle: "Pecho sup.", trackable: true,
+        repsPattern: [15, 12, 10, 8], offsets: [-6, -4, -2, 0], baseTop: 26, step: 2,
+        note: "Estiramiento máximo abajo. El pecho superior es lo que se nota con camiseta." },
+      { id: "mar-remo-mancuerna", name: "Remo Mancuerna 1 mano", muscle: "Espalda", trackable: true,
+        repsPattern: [15, 12, 10, 8], offsets: [-6, -4, -2, 0], baseTop: 28, step: 2,
+        note: "Recorrido completo. Pausa 1 seg arriba apretando el dorsal." },
+      { id: "mar-vuelos-mancuerna", name: "Vuelos Laterales Mancuerna", muscle: "Hombro", trackable: true,
+        repsPattern: [20, 15, 12, 10], offsets: [-2, 0, 0, 0], baseTop: 10, step: 1,
+        note: "45 seg de descanso. Da anchura de hombros — no hace falta ir muy pesado." },
+      { id: "mar-pullover", name: "Pullover en Polea Alta", muscle: "Espalda", trackable: true,
+        repsPattern: [15, 12, 10], offsets: [-5, -2, 0], baseTop: 27, step: 2.5,
+        note: "Brazos casi rectos. Siente el estiramiento del dorsal." },
+      { id: "mar-curl-predicador", name: "Curl Predicador (barra EZ)", muscle: "Bíceps", trackable: true,
+        repsPattern: [15, 12, 10], offsets: [-6, -3, 0], baseTop: 28, step: 1.25,
+        note: "Sin trampa. Aislamiento puro. No estires del todo abajo." },
+      { id: "mar-extension-triceps", name: "Extensiones Tríceps Polea", muscle: "Tríceps", trackable: true,
+        repsPattern: [15, 12, 10], offsets: [-7, -2, 0], baseTop: 32, step: 2.5,
+        note: "Codos fijos. Bloqueo total abajo." },
+    ],
+  },
+  {
+    id: "jueves", label: "JUE", fullName: "JUEVES", type: "PIERNA", tag: "Completa",
+    subtitle: "Cuádriceps · Isquios · Gemelos · Core", accent: "#38BDF8", bg: "#001a2a",
+    focus: "El único día de pierna — no recortes nada. Descansa 3 min en sentadilla y prensa.",
+    exercises: [
+      { id: "jue-sentadilla", name: "Sentadilla Libre", muscle: "Cuádriceps", trackable: true,
+        repsPattern: [10, 8, 6, 5], offsets: [-20, -10, -5, 0], baseTop: 100, step: 2.5,
+        note: "Técnica antes que ego. Al completar las reps de la última serie → sube 2,5 kg." },
+      { id: "jue-peso-muerto", name: "Peso Muerto Rumano", muscle: "Isquios", trackable: true,
+        repsPattern: [12, 10, 8, 6], offsets: [-15, -8, -3, 0], baseTop: 70, step: 2.5,
+        note: "Caderas atrás. Barra cerca del cuerpo. Técnica perfecta siempre." },
+      { id: "jue-prensa", name: "Prensa Inclinada", muscle: "Cuádriceps", trackable: true,
+        repsPattern: [12, 10, 8, 6], offsets: [-30, -15, -5, 0], baseTop: 170, step: 5,
+        note: "Pies bajos en la plataforma = más cuádriceps." },
+      { id: "jue-curl-femoral", name: "Curl Femoral Tumbado", muscle: "Isquios", trackable: true,
+        repsPattern: [15, 12, 10, 8], offsets: [-10, -5, -3, 0], baseTop: 45, step: 2.5,
+        note: "Aprieta 1 seg al final del recorrido." },
+      { id: "jue-extension-cuadriceps", name: "Extensión Cuádriceps (máquina)", muscle: "Cuádriceps", trackable: true,
+        repsPattern: [15, 12, 10], offsets: [-10, -5, 0], baseTop: 40, step: 2.5,
+        note: "Pausa 1 seg arriba. Finisher de cuádriceps." },
+      { id: "jue-gemelos", name: "Gemelos de Pie (máquina)", muscle: "Gemelos", trackable: true,
+        repsPattern: [20, 15, 12, 10], offsets: [-20, -10, -2, 0], baseTop: 60, step: 2.5,
+        note: "Pausa 2 seg en estiramiento abajo. Los gemelos responden a volumen." },
+      { id: "jue-plancha", name: "Plancha", muscle: "Core", trackable: false,
+        staticPyramid: [
+          { set: 1, reps: "45 seg", weight: "—" },
+          { set: 2, reps: "45 seg", weight: "—" },
+          { set: 3, reps: "45 seg", weight: "—" } ],
+        note: "Glúteos y abdomen apretados. Sin caer las caderas." },
+    ],
+  },
+  {
+    id: "viernes", label: "VIE", fullName: "VIERNES", type: "UPPER C", tag: "Estética",
+    subtitle: "Hombro 3D · Pecho · Brazos · 4º día (opcional)", accent: "#E879F9", bg: "#1a0020",
+    focus: "Día de detalle y quema, descansos cortos. Es el 4º día — si alguna semana no llegas, prioriza los otros 3 y ya está.",
+    exercises: [
+      { id: "vie-press-arnold", name: "Press Arnold (sentado)", muscle: "Hombro", trackable: true,
+        repsPattern: [15, 12, 10, 8], offsets: [-6, -4, -2, 0], baseTop: 20, step: 2,
+        note: "Los 3 haces del deltoides en un solo ejercicio. Rotación controlada." },
+      { id: "vie-vuelos-polea", name: "Vuelos Laterales (polea baja)", muscle: "Hombro lat.", trackable: true,
+        repsPattern: [20, 15, 12, 10], offsets: [-2, 0, 0, 0], baseTop: 7, step: 1,
+        note: "La polea da tensión constante — más efectivo para el lateral que la mancuerna." },
+      { id: "vie-face-pull", name: "Face Pull Polea", muscle: "Hombro post.", trackable: true,
+        repsPattern: [15, 15, 12], offsets: [-5, -2, 0], baseTop: 20, step: 2.5,
+        note: "Salud del manguito rotador. No lo saltes nunca — previene lesiones." },
+      { id: "vie-cruces-polea", name: "Cruces Polea Baja", muscle: "Pecho sup.", trackable: true,
+        repsPattern: [15, 12, 10], offsets: [-2.5, -0.5, 0], baseTop: 7.5, step: 1,
+        note: "Tira hacia arriba y al centro. Estiramiento máximo abajo." },
+      { id: "vie-curl-martillo", name: "Curl Martillo con Cuerda (polea)", muscle: "Bíceps", trackable: true,
+        repsPattern: [15, 12, 10], offsets: [-5, -2, 0], baseTop: 30, step: 1.25,
+        note: "Separa las manos arriba. Trabaja braquial y braquiorradial." },
+      { id: "vie-patada-triceps", name: "Patada de Tríceps (mancuerna)", muscle: "Tríceps", trackable: true,
+        repsPattern: [15, 12, 10], offsets: [-2, 0, 0], baseTop: 8, step: 1,
+        note: "Codo fijo. Contracción total al final. Aprieta 1 seg." },
+      { id: "vie-rueda-abdominal", name: "Rueda Abdominal", muscle: "Core", trackable: false,
+        staticPyramid: [
+          { set: 1, reps: "10", weight: "—" },
+          { set: 2, reps: "10", weight: "—" },
+          { set: 3, reps: "8", weight: "—" } ],
+        note: "Estiramiento controlado. No arquees la espalda baja." },
+    ],
+  },
+];
+
+var weekDaysList = [
+  { label: "L", id: "lunes", active: true },
+  { label: "M", id: "martes", active: true },
+  { label: "X", active: false },
+  { label: "J", id: "jueves", active: true },
+  { label: "V", id: "viernes", active: true },
+  { label: "S", active: false },
+  { label: "D", active: false },
+];
+
+var muscleColors = {
+  "Pecho": "#FF6B35", "Pecho sup.": "#FF6B35",
+  "Espalda": "#C8FF00",
+  "Hombro": "#38BDF8", "Hombro lat.": "#38BDF8", "Hombro post.": "#38BDF8",
+  "Bíceps": "#E879F9", "Tríceps": "#E879F9",
+  "Cuádriceps": "#FB923C", "Isquios": "#FB923C",
+  "Gemelos": "#34D399", "Core": "#94A3B8",
+};
+
+var CHECK_SVG = '<svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var CHEVRON_SVG = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4.5L6 8L10 4.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+var STORAGE_KEY = "planAnualProgresoV1";
+
+function buildDefaultProgress() {
+  var exercises = {};
+  days.forEach(function (day) {
+    day.exercises.forEach(function (ex) {
+      if (ex.trackable) exercises[ex.id] = { top: ex.baseTop, history: [] };
+    });
+  });
+  return { exercises: exercises };
+}
+
+function loadProgress() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      var def = buildDefaultProgress();
+      parsed.exercises = Object.assign({}, def.exercises, parsed.exercises || {});
+      return parsed;
+    }
+  } catch (e) { console.error("No se pudo leer el progreso guardado", e); }
+  return buildDefaultProgress();
+}
+
+function saveProgress(p) {
+  progress = p;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
+  catch (e) { console.error("No se pudo guardar el progreso", e); }
+}
+
+function getPyramid(ex, prog) {
+  if (!ex.trackable) return ex.staticPyramid;
+  var entry = prog.exercises[ex.id];
+  var top = entry ? entry.top : ex.baseTop;
+  return ex.repsPattern.map(function (reps, i) {
+    return { set: i + 1, reps: reps, weight: round(top + ex.offsets[i]) + " kg" };
+  });
+}
+
+function findExercise(exId) {
+  for (var d = 0; d < days.length; d++) {
+    for (var e = 0; e < days[d].exercises.length; e++) {
+      if (days[d].exercises[e].id === exId) return days[d].exercises[e];
+    }
+  }
+  return null;
+}
+
+/* ---------------- STATE ---------------- */
+var activeDay = "lunes";
+var checked = {};
+var expanded = {};
+var progress = loadProgress();
+var editingId = null;
+var toastMsg = "";
+var toastTimeout = null;
+var planOpen = false;
+var confirmReset = false;
+var confirmResetTimeout = null;
+
+/* ---------------- ACTIONS ---------------- */
+function setActiveDay(id) { activeDay = id; expanded = {}; editingId = null; render(); }
+function toggleCheck(i) { var k = activeDay + "-" + i; checked[k] = !checked[k]; render(); }
+function toggleExpand(i) { var k = activeDay + "-" + i; expanded[k] = !expanded[k]; render(); }
+function togglePlan() { planOpen = !planOpen; render(); }
+function openLogger(exId) { editingId = exId; render(); }
+function cancelLogger() { editingId = null; render(); }
+
+function showToast(msg) {
+  toastMsg = msg;
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(function () { toastMsg = ""; render(); }, 3000);
+  render();
+}
+
+function saveLog(exId) {
+  var ex = findExercise(exId);
+  if (!ex) return;
+  var wEl = document.getElementById("inp-weight");
+  var rEl = document.getElementById("inp-reps");
+  var w = parseFloat(String(wEl.value).replace(",", "."));
+  var r = parseInt(rEl.value, 10);
+  if (isNaN(w) || isNaN(r)) { showToast("Revisa los números introducidos."); return; }
+  var targetReps = ex.repsPattern[ex.repsPattern.length - 1];
+  var reached = r >= targetReps;
+  var newTop = reached ? round(w + ex.step) : round(w);
+  var prevEntry = progress.exercises[ex.id] || { top: ex.baseTop, history: [] };
+  var newHistory = (prevEntry.history || []).concat([{ date: todayISO(), weight: w, reps: r }]).slice(-10);
+  progress.exercises[ex.id] = { top: newTop, history: newHistory };
+  saveProgress(progress);
+  editingId = null;
+  showToast(reached ? "Guardado ✓ Próxima vez: " + newTop + " kg" : "Guardado ✓ Repetimos " + newTop + " kg la próxima");
+}
+
+function handleReset() {
+  if (!confirmReset) {
+    confirmReset = true;
+    clearTimeout(confirmResetTimeout);
+    confirmResetTimeout = setTimeout(function () { confirmReset = false; render(); }, 4000);
+    render();
+    return;
+  }
+  saveProgress(buildDefaultProgress());
+  confirmReset = false;
+  showToast("Progreso reiniciado.");
+}
+
+/* ---------------- RENDER ---------------- */
+function render() {
+  var app = document.getElementById("app");
+  var today = todayISO();
+  var currentPhase = getPhase(today);
+  var weekNumber = getWeekNumber(today);
+  var day = days.filter(function (d) { return d.id === activeDay; })[0];
+  var done = day.exercises.filter(function (_, i) { return checked[activeDay + "-" + i]; }).length;
+  var total = day.exercises.length;
+  var pct = Math.round((done / total) * 100);
+
+  document.body.style.background = day.bg;
+
+  var html = "";
+
+  if (toastMsg) html += '<div class="toast">' + toastMsg + "</div>";
+
+  html += '<div class="wrap">';
+
+  /* header */
+  html += '<div class="header">' +
+    '<div class="glow" style="background:' + day.accent + '"></div>' +
+    '<div class="eyebrow">ESPECIALIZACIÓN TREN SUPERIOR · PLAN 1 AÑO</div>' +
+    '<div class="title">3 UPPER<br><span style="color:' + day.accent + '">1 PIERNA</span></div>' +
+    '<div class="subtitle">Julio 2026 → Junio 2027 · Semana ' + weekNumber + ' de 52</div>' +
+    '<div class="phasepill" style="background:' + currentPhase.color + '15;border:1px solid ' + currentPhase.color + '40" onclick="togglePlan()">' +
+      '<span class="dot" style="background:' + currentPhase.color + '"></span>' +
+      '<span style="font-size:12px;font-weight:700;color:' + currentPhase.color + '">' + currentPhase.name + "</span>" +
+      '<span style="font-size:10px;color:rgba(255,255,255,0.35)">· ' + currentPhase.tag + "</span>" +
+      '<span class="chevron' + (planOpen ? " open" : "") + '">' + CHEVRON_SVG + "</span>" +
+    "</div>";
+
+  if (planOpen) {
+    html += '<div class="planpanel" style="border:1px solid ' + currentPhase.color + '30">' +
+      '<div class="plandesc">' + currentPhase.desc + "</div>" +
+      '<div class="planlabel">LAS 12 FASES DEL AÑO</div>';
+    phases.forEach(function (p) {
+      var isCurrent = p.id === currentPhase.id;
+      html += '<div class="phaserow" style="opacity:' + (isCurrent ? 1 : 0.55) + '">' +
+        '<div class="phaseleft">' +
+          '<span class="dot" style="background:' + p.color + '"></span>' +
+          '<span class="phasename' + (isCurrent ? " current" : "") + '">' + p.name + "</span>" +
+          (isCurrent ? '<span class="heretag" style="color:' + p.color + '">ESTÁS AQUÍ</span>' : "") +
+        "</div>" +
+        '<span class="phasedate">' + formatDateEs(p.start) + " – " + formatDateEs(p.end) + "</span>" +
+      "</div>";
+    });
+    html += "</div>";
+  }
+
+  html += '<div class="weekpills">';
+  weekDaysList.forEach(function (w) {
+    var isActive = w.id === activeDay;
+    var bg = isActive ? day.accent : (w.active ? "rgba(255,255,255,0.07)" : "transparent");
+    var color = isActive ? "#000" : (w.active ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.15)");
+    var border = isActive ? "none" : (w.active ? "1px solid rgba(255,255,255,0.1)" : "none");
+    var cursor = w.active ? "pointer" : "default";
+    var click = (w.active && w.id) ? ' onclick="setActiveDay(\'' + w.id + '\')"' : "";
+    html += '<div class="daybtn" style="background:' + bg + ";color:" + color + ";border:" + border + ";cursor:" + cursor + '"' + click + ">" + w.label + "</div>";
+  });
+  html += "</div></div>";
+
+  /* day card */
+  html += '<div class="daycard-wrap"><div class="daycard" style="border:1px solid ' + day.accent + '30">' +
+    '<div class="daycard-top"><div>' +
+      '<div class="typebadge" style="background:' + day.accent + "20;border:1px solid " + day.accent + '40">' +
+        '<span class="t1" style="color:' + day.accent + '">' + day.type + "</span>" +
+        '<span class="sep" style="background:' + day.accent + '"></span>' +
+        '<span class="t2" style="color:' + day.accent + '">' + day.tag.toUpperCase() + "</span>" +
+      "</div>" +
+      '<div class="dayname">' + day.fullName + "</div>" +
+      '<div class="daysub">' + day.subtitle + "</div>" +
+    "</div>" +
+    '<div class="pctbox">' +
+      '<div class="pctnum" style="color:' + ((done === total && done > 0) ? day.accent : "rgba(255,255,255,0.2)") + '">' + pct + "%</div>" +
+      '<div class="pctlabel">' + done + "/" + total + " HECHOS</div>" +
+    "</div></div>" +
+    '<div class="barbg"><div class="barfill" style="width:' + pct + "%;background:linear-gradient(90deg, " + day.accent + "aa, " + day.accent + ')"></div></div>' +
+    '<div class="focus">' + day.focus + "</div>" +
+  "</div></div>";
+
+  /* exercises */
+  html += '<div class="exlist">';
+  day.exercises.forEach(function (ex, i) {
+    var key = activeDay + "-" + i;
+    var isDone = checked[key];
+    var isOpen = expanded[key];
+    var mc = muscleColors[ex.muscle] || "#888";
+    var pyramid = getPyramid(ex, progress);
+    var entry = ex.trackable ? progress.exercises[ex.id] : null;
+    var lastLog = entry && entry.history.length ? entry.history[entry.history.length - 1] : null;
+    var isEditing = editingId === ex.id;
+
+    html += '<div class="excard" style="background:' + (isDone ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)") +
+      ";border:1px solid " + (isDone ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.09)") + ";opacity:" + (isDone ? 0.45 : 1) + '">' +
+      '<div class="exhead">' +
+        '<div class="chk" style="border:2px solid ' + (isDone ? day.accent : "rgba(255,255,255,0.15)") + ";background:" + (isDone ? day.accent : "transparent") + '" onclick="toggleCheck(' + i + ')">' + (isDone ? CHECK_SVG : "") + "</div>" +
+        '<div class="exinfo" onclick="toggleExpand(' + i + ')">' +
+          '<div class="exname-row">' +
+            '<span class="exname" style="color:' + (isDone ? "rgba(255,255,255,0.3)" : "#fff") + ";text-decoration:" + (isDone ? "line-through" : "none") + '">' + ex.name + "</span>" +
+            '<span class="muscletag" style="background:' + mc + "20;color:" + mc + '">' + ex.muscle.toUpperCase() + "</span>" +
+          "</div>" +
+          '<div class="exmeta">' + pyramid.length + " series · " + pyramid[0].reps + "→" + pyramid[pyramid.length - 1].reps + " reps" +
+            (lastLog ? " · Últ: " + lastLog.weight + " kg×" + lastLog.reps + " (" + formatDateEs(lastLog.date) + ")" : "") +
+          "</div>" +
+        "</div>" +
+        '<div class="expbtn" style="transform:' + (isOpen ? "rotate(180deg)" : "rotate(0deg)") + '" onclick="toggleExpand(' + i + ')">' + CHEVRON_SVG + "</div>" +
+      "</div>";
+
+    if (isOpen) {
+      html += '<div class="pyramid"><div class="pyhead"><span>SER</span><span>REPS</span><span>PESO</span><span style="text-align:right">INT.</span></div>';
+      pyramid.forEach(function (p, pi) {
+        var intensity = Math.round(((pi + 1) / pyramid.length) * 100);
+        var denom = (pyramid.length - 1) || 1;
+        var opSet = 0.5 + (pi / denom) * 0.5;
+        var opInt = 0.4 + (pi / denom) * 0.6;
+        html += '<div class="pyrow">' +
+          '<span class="pyset" style="color:' + day.accent + ";opacity:" + opSet + '">' + p.set + "</span>" +
+          '<span class="pyreps">' + p.reps + "</span>" +
+          '<span class="pyweight">' + p.weight + "</span>" +
+          '<div class="pyint"><span style="color:' + day.accent + ";opacity:" + opInt + '">' + intensity + "%</span></div>" +
+        "</div>";
+      });
+      html += '<div class="tip">' + ex.note + "</div>";
+
+      if (ex.trackable) {
+        html += '<div class="logwrap">';
+        if (!isEditing) {
+          html += '<div class="logbtn" style="background:' + day.accent + "15;border:1px solid " + day.accent + "35;color:" + day.accent + '" onclick="openLogger(\'' + ex.id + '\')">✎ Registrar lo que hiciste hoy</div>';
+        } else {
+          html += '<div class="logform-row">' +
+            '<div class="logform-col"><div class="logform-label">PESO (KG)</div>' +
+              '<input id="inp-weight" class="numin" type="number" inputmode="decimal" step="0.5" value="' + entry.top + '"></div>' +
+            '<div class="logform-col"><div class="logform-label">REPS EN LA ÚLTIMA SERIE</div>' +
+              '<input id="inp-reps" class="numin" type="number" inputmode="numeric" step="1" value="' + ex.repsPattern[ex.repsPattern.length - 1] + '"></div>' +
+          "</div>" +
+          '<div class="logform-actions">' +
+            '<div class="logform-btn" style="background:' + day.accent + ';color:#000" onclick="saveLog(\'' + ex.id + '\')">Guardar</div>' +
+            '<div class="logform-btn" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6)" onclick="cancelLogger()">Cancelar</div>' +
+          "</div>";
+        }
+        html += "</div>";
+      }
+      html += "</div>";
+    }
+    html += "</div>";
+  });
+  html += "</div>";
+
+  /* weekly overview */
+  var overviewRows = [
+    { day: "Lunes", type: "Upper A", tag: "Fuerza", accent: "#C8FF00" },
+    { day: "Martes", type: "Upper B", tag: "Hipertrofia", accent: "#FF6B35" },
+    { day: "Miércoles", type: "Descanso", tag: "Cardio opcional", accent: "#333" },
+    { day: "Jueves", type: "Pierna", tag: "Completa", accent: "#38BDF8" },
+    { day: "Viernes", type: "Upper C", tag: "4º día · opcional", accent: "#E879F9" },
+    { day: "Sábado", type: "Descanso", tag: "Cardio opcional", accent: "#333" },
+    { day: "Domingo", type: "Descanso", tag: "Recuperación", accent: "#222" },
+  ];
+  html += '<div class="overview"><div class="overview-title">VISIÓN SEMANAL</div>';
+  overviewRows.forEach(function (row) {
+    var dim = row.accent === "#333" || row.accent === "#222";
+    html += '<div class="overow"><div class="overleft"><span class="overdot" style="background:' + row.accent + '"></span>' +
+      '<span class="overday" style="color:' + (dim ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.8)") + '">' + row.day + "</span></div>" +
+      '<div><span class="overtype" style="color:' + (dim ? "rgba(255,255,255,0.2)" : row.accent) + '">' + row.type + "</span>" +
+      '<span class="overtag">' + row.tag + "</span></div></div>";
+  });
+  html += "</div>";
+
+  /* progression rule */
+  var ruleText = currentPhase.tag === "Mantenimiento"
+    ? "Estás en fase de mantenimiento. No busques subir peso: repite lo que puedas, con buena técnica, sin agobios."
+    : currentPhase.tag === "Recuperación"
+    ? "Semana de descarga: baja el peso ~10% o quita una serie por ejercicio. Es parte del plan, no un retroceso."
+    : 'Cuando completes todas las reps de la última serie → pulsa "Registrar" y sube el peso. Sin llegar al tope, repite el mismo peso. Así de simple.';
+
+  html += '<div class="rulebox" style="background:' + day.accent + "10;border:1px solid " + day.accent + '25">' +
+    '<div class="rulelabel" style="color:' + day.accent + '">REGLA DE PROGRESIÓN · ' + currentPhase.name.toUpperCase() + "</div>" +
+    '<div class="ruletext">' + ruleText + "</div>" +
+  "</div>";
+
+  /* footer */
+  html += '<div class="footer"><div class="resetlink" style="color:' + (confirmReset ? "#FF6B35" : "rgba(255,255,255,0.2)") + '" onclick="handleReset()">' +
+    (confirmReset ? "¿Seguro? Toca de nuevo para reiniciar" : "Reiniciar progreso guardado") +
+  "</div></div>";
+
+  html += "</div>";
+
+  app.innerHTML = html;
+}
+
+render();
+</script>
+</body>
+</html>

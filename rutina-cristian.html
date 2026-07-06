@@ -99,6 +99,21 @@
   .logform-actions { display: flex; gap: 8px; }
   .logform-btn { flex: 1; text-align: center; padding: 10px; border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
 
+  .editbar { display: flex; justify-content: flex-end; margin-top: 14px; }
+  .editbtn { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; padding: 8px 14px; border-radius: 10px; cursor: pointer; }
+  .exname-input { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18); color: #fff; border-radius: 7px; padding: 5px 8px; width: 100%; min-width: 0; }
+  .exname-input:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+  .pyhead-edit { display: grid; grid-template-columns: 34px 1fr 1fr 30px; gap: 6px; padding: 7px 14px; background: rgba(0,0,0,0.2); font-size: 8px; font-weight: 700; letter-spacing: 2px; color: rgba(255,255,255,0.2); }
+  .pyrow-edit { display: grid; grid-template-columns: 34px 1fr 1fr 30px; gap: 6px; padding: 7px 14px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .pyrow-edit:last-of-type { border-bottom: none; }
+  .pysmallin { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 6px; padding: 6px 7px; width: 100%; min-width: 0; }
+  .pysmallin:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+  .setdel { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: rgba(255,80,80,0.15); color: #ff6b6b; font-size: 14px; font-weight: 800; cursor: pointer; flex-shrink: 0; }
+  .addsetbtn { margin: 8px 14px 2px; padding: 9px; border-radius: 8px; background: rgba(255,255,255,0.05); text-align: center; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); cursor: pointer; }
+  .exdelbtn { margin: 10px 14px 2px; padding: 9px; border-radius: 8px; background: rgba(255,80,80,0.1); text-align: center; font-size: 11px; font-weight: 700; color: #ff6b6b; cursor: pointer; }
+  .addexbtn { margin: 14px 20px 0; padding: 13px; border-radius: 14px; border: 1px dashed rgba(255,255,255,0.18); text-align: center; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.4); cursor: pointer; }
+  .restorebtn { margin: 10px 20px 0; padding: 9px; border-radius: 10px; background: rgba(255,255,255,0.04); text-align: center; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); cursor: pointer; }
+
   .overview { margin: 4px 20px 16px; padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; }
   .overview-title { font-size: 9px; font-weight: 700; letter-spacing: 3px; color: rgba(255,255,255,0.25); margin-bottom: 12px; }
   .overow { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
@@ -502,7 +517,7 @@ function buildDefaultProgress() {
       });
     });
   });
-  return { exercises: exercises };
+  return { exercises: exercises, overrides: {}, removed: {}, custom: {} };
 }
 
 function loadProgress() {
@@ -512,10 +527,19 @@ function loadProgress() {
       var parsed = JSON.parse(raw);
       var def = buildDefaultProgress();
       parsed.exercises = Object.assign({}, def.exercises, parsed.exercises || {});
+      parsed.overrides = parsed.overrides || {};
+      parsed.removed = parsed.removed || {};
+      parsed.custom = parsed.custom || {};
       return parsed;
     }
   } catch (e) { console.error("No se pudo leer el progreso guardado", e); }
   return buildDefaultProgress();
+}
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
 }
 
 function saveProgress(p) {
@@ -556,6 +580,114 @@ var toastTimeout = null;
 var planOpen = false;
 var confirmReset = false;
 var confirmResetTimeout = null;
+var editMode = false;
+
+/* ---------------- EDICIÓN DE RUTINA (pesos, series, ejercicios) ---------------- */
+function effectiveExercises(day, prog) {
+  var list = [];
+  day.exercises.forEach(function (ex) {
+    if (prog.removed[ex.id]) return;
+    list.push({ key: ex.id, base: ex, custom: false });
+  });
+  (prog.custom[day.id] || []).forEach(function (key) {
+    list.push({ key: key, base: null, custom: true });
+  });
+  return list;
+}
+
+function getDisplayData(item, prog) {
+  var ov = prog.overrides[item.key];
+  if (ov) {
+    return {
+      name: ov.name,
+      muscle: (item.base && item.base.muscle) || "Core",
+      note: item.base ? item.base.note : "Ejercicio añadido por ti.",
+      pyramid: ov.sets.map(function (s, i) { return { set: i + 1, reps: s.reps, weight: s.weight }; }),
+      trackable: false,
+    };
+  }
+  var ex = item.base;
+  return { name: ex.name, muscle: ex.muscle, note: ex.note, pyramid: getPyramid(ex, prog), trackable: ex.trackable };
+}
+
+function ensureOverride(key) {
+  if (!progress.overrides[key]) {
+    var ex = findExercise(key);
+    if (ex) {
+      var basePyramid = getPyramid(ex, progress);
+      progress.overrides[key] = {
+        name: ex.name,
+        sets: basePyramid.map(function (p) { return { reps: String(p.reps), weight: String(p.weight) }; }),
+      };
+    } else {
+      progress.overrides[key] = { name: "Nuevo ejercicio", sets: [{ reps: "10", weight: "0 kg" }] };
+    }
+  }
+  return progress.overrides[key];
+}
+
+function toggleEditMode() { editMode = !editMode; render(); }
+
+function updateExerciseName(key, value) {
+  var ov = ensureOverride(key);
+  ov.name = value;
+  saveProgress(progress);
+  render();
+}
+
+function updateSetField(key, idx, field, value) {
+  var ov = ensureOverride(key);
+  ov.sets[idx][field] = value;
+  saveProgress(progress);
+  render();
+}
+
+function addSet(key) {
+  var ov = ensureOverride(key);
+  var last = ov.sets[ov.sets.length - 1] || { reps: "10", weight: "0 kg" };
+  ov.sets.push({ reps: last.reps, weight: last.weight });
+  saveProgress(progress);
+  render();
+}
+
+function removeSet(key, idx) {
+  var ov = ensureOverride(key);
+  if (ov.sets.length <= 1) { showToast("Debe quedar al menos 1 serie."); return; }
+  ov.sets.splice(idx, 1);
+  saveProgress(progress);
+  render();
+}
+
+function addExercise(dayId) {
+  var id = "custom-" + dayId + "-" + Date.now();
+  progress.overrides[id] = { name: "Nuevo ejercicio", sets: [{ reps: "10", weight: "0 kg" }] };
+  if (!progress.custom[dayId]) progress.custom[dayId] = [];
+  progress.custom[dayId].push(id);
+  saveProgress(progress);
+  expanded[dayId + "-" + id] = true;
+  render();
+}
+
+function removeExercise(key) {
+  var ex = findExercise(key);
+  if (ex) {
+    progress.removed[key] = true;
+  } else {
+    progress.custom[activeDay] = (progress.custom[activeDay] || []).filter(function (k) { return k !== key; });
+  }
+  delete progress.overrides[key];
+  saveProgress(progress);
+  render();
+}
+
+function restoreRemoved(dayId) {
+  var block = blocks[activeBlock];
+  var day = block.days.filter(function (d) { return d.id === dayId; })[0];
+  if (!day) return;
+  day.exercises.forEach(function (ex) { delete progress.removed[ex.id]; });
+  saveProgress(progress);
+  render();
+}
 
 /* ---------------- ACTIONS ---------------- */
 function setActiveBlock(i) {
@@ -617,9 +749,10 @@ function render() {
   var block = blocks[activeBlock];
   var accent = block.accent;
   var day = block.days.filter(function (d) { return d.id === activeDay; })[0] || block.days[0];
-  var done = day.exercises.filter(function (_, i) { return checked[activeDay + "-" + i]; }).length;
-  var total = day.exercises.length;
-  var pct = Math.round((done / total) * 100);
+  var effList = effectiveExercises(day, progress);
+  var done = effList.filter(function (item) { return checked[activeDay + "-" + item.key]; }).length;
+  var total = effList.length;
+  var pct = total ? Math.round((done / total) * 100) : 0;
 
   document.body.style.background = day.bg;
 
@@ -703,65 +836,91 @@ function render() {
     "</div></div>" +
     '<div class="barbg"><div class="barfill" style="width:' + pct + "%;background:linear-gradient(90deg, " + day.accent + "aa, " + day.accent + ')"></div></div>' +
     '<div class="focus">' + day.focus + "</div>" +
+    '<div class="editbar"><div class="editbtn" style="background:' + (editMode ? day.accent : "rgba(255,255,255,0.06)") + ";color:" + (editMode ? "#000" : "rgba(255,255,255,0.5)") + '" onclick="toggleEditMode()">' + (editMode ? "✓ Listo" : "✎ Editar rutina") + "</div></div>" +
   "</div></div>";
 
   /* exercises */
   html += '<div class="exlist">';
-  day.exercises.forEach(function (ex, i) {
-    var key = activeDay + "-" + i;
-    var isDone = checked[key];
-    var isOpen = expanded[key];
-    var mc = muscleColors[ex.muscle] || "#888";
-    var pyramid = getPyramid(ex, progress);
-    var entry = ex.trackable ? progress.exercises[ex.id] : null;
+  effList.forEach(function (item) {
+    var key = item.key;
+    var data = getDisplayData(item, progress);
+    var stateKey = activeDay + "-" + key;
+    var isDone = checked[stateKey];
+    var isOpen = expanded[stateKey];
+    var mc = muscleColors[data.muscle] || "#888";
+    var pyramid = data.pyramid;
+    var entry = data.trackable ? progress.exercises[key] : null;
     var lastLog = entry && entry.history.length ? entry.history[entry.history.length - 1] : null;
-    var isEditing = editingId === ex.id;
+    var isEditingLog = editingId === key;
 
     html += '<div class="excard" style="background:' + (isDone ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)") +
       ";border:1px solid " + (isDone ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.09)") + ";opacity:" + (isDone ? 0.45 : 1) + '">' +
       '<div class="exhead">' +
-        '<div class="chk" style="border:2px solid ' + (isDone ? day.accent : "rgba(255,255,255,0.15)") + ";background:" + (isDone ? day.accent : "transparent") + '" onclick="toggleCheck(' + i + ')">' + (isDone ? CHECK_SVG : "") + "</div>" +
-        '<div class="exinfo" onclick="toggleExpand(' + i + ')">' +
-          '<div class="exname-row">' +
-            '<span class="exname" style="color:' + (isDone ? "rgba(255,255,255,0.3)" : "#fff") + ";text-decoration:" + (isDone ? "line-through" : "none") + '">' + ex.name + "</span>" +
-            '<span class="muscletag" style="background:' + mc + "20;color:" + mc + '">' + ex.muscle.toUpperCase() + "</span>" +
-          "</div>" +
-          '<div class="exmeta">' + pyramid.length + " series · " + pyramid[0].reps + "→" + pyramid[pyramid.length - 1].reps + " reps" +
+        '<div class="chk" style="border:2px solid ' + (isDone ? day.accent : "rgba(255,255,255,0.15)") + ";background:" + (isDone ? day.accent : "transparent") + '" onclick="toggleCheck(\'' + key + '\')">' + (isDone ? CHECK_SVG : "") + "</div>" +
+        '<div class="exinfo" onclick="toggleExpand(\'' + key + '\')">' +
+          (editMode ?
+            '<div class="exname-row">' +
+              '<input class="exname-input" value="' + esc(data.name) + '" onchange="updateExerciseName(\'' + key + '\', this.value)" onclick="event.stopPropagation()">' +
+              '<span class="muscletag" style="background:' + mc + "20;color:" + mc + '">' + esc(data.muscle).toUpperCase() + "</span>" +
+            "</div>"
+            :
+            '<div class="exname-row">' +
+              '<span class="exname" style="color:' + (isDone ? "rgba(255,255,255,0.3)" : "#fff") + ";text-decoration:" + (isDone ? "line-through" : "none") + '">' + esc(data.name) + "</span>" +
+              '<span class="muscletag" style="background:' + mc + "20;color:" + mc + '">' + esc(data.muscle).toUpperCase() + "</span>" +
+            "</div>"
+          ) +
+          '<div class="exmeta">' + pyramid.length + " series · " + esc(pyramid[0].reps) + "→" + esc(pyramid[pyramid.length - 1].reps) + " reps" +
             (lastLog ? " · Últ: " + lastLog.weight + " kg×" + lastLog.reps : "") +
           "</div>" +
         "</div>" +
-        '<div class="expbtn" style="transform:' + (isOpen ? "rotate(180deg)" : "rotate(0deg)") + '" onclick="toggleExpand(' + i + ')">' + CHEVRON_SVG + "</div>" +
+        '<div class="expbtn" style="transform:' + (isOpen ? "rotate(180deg)" : "rotate(0deg)") + '" onclick="toggleExpand(\'' + key + '\')">' + CHEVRON_SVG + "</div>" +
       "</div>";
 
     if (isOpen) {
-      html += '<div class="pyramid"><div class="pyhead"><span>SER</span><span>REPS</span><span>PESO / MOV.</span><span style="text-align:right">INT.</span></div>';
-      pyramid.forEach(function (p, pi) {
-        var intensity = Math.round(((pi + 1) / pyramid.length) * 100);
-        var denom = (pyramid.length - 1) || 1;
-        var opSet = 0.5 + (pi / denom) * 0.5;
-        var opInt = 0.4 + (pi / denom) * 0.6;
-        html += '<div class="pyrow">' +
-          '<span class="pyset" style="color:' + day.accent + ";opacity:" + opSet + '">' + p.set + "</span>" +
-          '<span class="pyreps">' + p.reps + "</span>" +
-          '<span class="pyweight">' + p.weight + "</span>" +
-          '<div class="pyint"><span style="color:' + day.accent + ";opacity:" + opInt + '">' + (ex.trackable ? intensity + "%" : "—") + "</span></div>" +
-        "</div>";
-      });
-      html += '<div class="tip">' + ex.note + "</div>";
+      html += '<div class="pyramid">';
+      if (editMode) {
+        html += '<div class="pyhead-edit"><span>SER</span><span>REPS</span><span>PESO / MOV.</span><span></span></div>';
+        pyramid.forEach(function (p, pi) {
+          html += '<div class="pyrow-edit">' +
+            '<span class="pyset" style="color:' + day.accent + '">' + p.set + "</span>" +
+            '<input class="pysmallin" value="' + esc(p.reps) + '" onchange="updateSetField(\'' + key + '\', ' + pi + ', \'reps\', this.value)">' +
+            '<input class="pysmallin" value="' + esc(p.weight) + '" onchange="updateSetField(\'' + key + '\', ' + pi + ', \'weight\', this.value)">' +
+            '<div class="setdel" onclick="removeSet(\'' + key + '\', ' + pi + ')">×</div>' +
+          "</div>";
+        });
+        html += '<div class="addsetbtn" onclick="addSet(\'' + key + '\')">+ Añadir serie</div>';
+      } else {
+        html += '<div class="pyhead"><span>SER</span><span>REPS</span><span>PESO / MOV.</span><span style="text-align:right">INT.</span></div>';
+        pyramid.forEach(function (p, pi) {
+          var intensity = Math.round(((pi + 1) / pyramid.length) * 100);
+          var denom = (pyramid.length - 1) || 1;
+          var opSet = 0.5 + (pi / denom) * 0.5;
+          var opInt = 0.4 + (pi / denom) * 0.6;
+          html += '<div class="pyrow">' +
+            '<span class="pyset" style="color:' + day.accent + ";opacity:" + opSet + '">' + p.set + "</span>" +
+            '<span class="pyreps">' + esc(p.reps) + "</span>" +
+            '<span class="pyweight">' + esc(p.weight) + "</span>" +
+            '<div class="pyint"><span style="color:' + day.accent + ";opacity:" + opInt + '">' + (data.trackable ? intensity + "%" : "—") + "</span></div>" +
+          "</div>";
+        });
+      }
+      html += '<div class="tip">' + esc(data.note) + "</div>";
 
-      if (ex.trackable) {
+      if (editMode) {
+        html += '<div class="exdelbtn" onclick="removeExercise(\'' + key + '\')">🗑 Eliminar este ejercicio</div>';
+      } else if (data.trackable) {
         html += '<div class="logwrap">';
-        if (!isEditing) {
-          html += '<div class="logbtn" style="background:' + day.accent + "15;border:1px solid " + day.accent + "35;color:" + day.accent + '" onclick="openLogger(\'' + ex.id + '\')">✎ Registrar lo que hiciste hoy</div>';
+        if (!isEditingLog) {
+          html += '<div class="logbtn" style="background:' + day.accent + "15;border:1px solid " + day.accent + "35;color:" + day.accent + '" onclick="openLogger(\'' + key + '\')">✎ Registrar lo que hiciste hoy</div>';
         } else {
           html += '<div class="logform-row">' +
             '<div class="logform-col"><div class="logform-label">PESO (KG)</div>' +
               '<input id="inp-weight" class="numin" type="number" inputmode="decimal" step="0.5" value="' + entry.top + '"></div>' +
             '<div class="logform-col"><div class="logform-label">REPS EN LA ÚLTIMA SERIE</div>' +
-              '<input id="inp-reps" class="numin" type="number" inputmode="numeric" step="1" value="' + ex.repsPattern[ex.repsPattern.length - 1] + '"></div>' +
+              '<input id="inp-reps" class="numin" type="number" inputmode="numeric" step="1" value="' + item.base.repsPattern[item.base.repsPattern.length - 1] + '"></div>' +
           "</div>" +
           '<div class="logform-actions">' +
-            '<div class="logform-btn" style="background:' + day.accent + ';color:#000" onclick="saveLog(\'' + ex.id + '\')">Guardar</div>' +
+            '<div class="logform-btn" style="background:' + day.accent + ';color:#000" onclick="saveLog(\'' + key + '\')">Guardar</div>' +
             '<div class="logform-btn" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6)" onclick="cancelLogger()">Cancelar</div>' +
           "</div>";
         }
@@ -771,6 +930,13 @@ function render() {
     }
     html += "</div>";
   });
+  if (editMode) {
+    var anyRemoved = day.exercises.some(function (ex) { return progress.removed[ex.id]; });
+    if (anyRemoved) {
+      html += '<div class="restorebtn" onclick="restoreRemoved(\'' + day.id + '\')">↺ Restaurar ejercicios eliminados de este día</div>';
+    }
+    html += '<div class="addexbtn" onclick="addExercise(\'' + day.id + '\')">+ Añadir ejercicio</div>';
+  }
   html += "</div>";
 
   /* weekly overview */

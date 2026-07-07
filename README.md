@@ -1,10 +1,11 @@
 # SimpleGym
 
-App de rutinas de gimnasio para dos personas (Nava y Cristian), en un único `index.html` sin build ni dependencias, pensada para servirse tal cual desde GitHub Pages.
+App de rutinas de gimnasio multi-persona (empezó con Nava y Cristian, pero cualquiera puede crear la suya desde la propia app), en un único `index.html` sin build ni dependencias, pensada para servirse tal cual desde GitHub Pages.
 
 ## Cómo funciona hoy
 
-- Al abrir la app eliges quién entrena (se recuerda en el dispositivo). También puedes ir directo con `index.html?u=nava` o `index.html?u=cristian`.
+- Al abrir la app eliges quién eres (se recuerda en el dispositivo). También puedes ir directo con `index.html?u=nava` o `index.html?u=cristian`.
+- Botón "+ Añadir rutina" en esa misma pantalla: crea una rutina nueva desde cero con solo poner un nombre. Empieza con 3 días vacíos (lunes/miércoles/viernes) y una fase única de progresión; se completa con "Editar rutina" → "+ Añadir ejercicio" en cada día, igual que con Nava o Cristian. Se guarda junto al resto de datos, así que la nueva rutina aparece en cualquier dispositivo, no solo en el que la creaste.
 - Los pesos, el registro de cada sesión y las ediciones de rutina (nombre, series, reps, ejercicios añadidos/eliminados) se guardan **siempre en local** (`localStorage`), así que funciona sin conexión.
 - Si configuras Supabase (ver abajo), además esos mismos datos se sincronizan en la nube: entras desde el móvil o el portátil y ves el mismo progreso.
 
@@ -60,7 +61,8 @@ Al no haber login, cualquiera que tenga la `anon key` (visible en el código fue
 
 ## Ideas para seguir mejorando
 
-- Añadir una nueva fase de periodización a Cristian (p. ej. una semana de descarga o un bloque de hipertrofia), o una rutina completa para una tercera persona (basta con un nuevo `*_CONFIG` + entrada en `PROFILES`).
+- Añadir una nueva fase de periodización a Cristian (p. ej. una semana de descarga o un bloque de hipertrofia).
+- Añadir más días/semana o fases desde la propia UI para las rutinas creadas con "+ Añadir rutina" (hoy solo se pueden añadir/editar ejercicios dentro de los 3 días iniciales, no días ni fases nuevas).
 - Login real por usuario (Supabase Auth) en vez del selector simple.
 - Historial y gráficas de progreso por ejercicio (ya se guarda el historial de las últimas 10 sesiones, solo falta visualizarlo).
 - Notificaciones/recordatorios de entrenamiento.

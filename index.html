@@ -47,6 +47,12 @@
   .userpick-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
   .userpick-btn { padding: 20px 26px; border-radius: 16px; cursor: pointer; min-width: 130px; text-align: center; }
   .userpick-note { font-size: 11px; color: rgba(255,255,255,0.3); text-align: center; max-width: 280px; line-height: 1.6; }
+  .userpick-add { padding: 20px 26px; border-radius: 16px; cursor: pointer; min-width: 130px; text-align: center; border: 1px dashed rgba(255,255,255,0.25); color: rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+  .userpick-form { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 280px; }
+  .userpick-input { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18); color: #fff; border-radius: 10px; padding: 12px 14px; width: 100%; }
+  .userpick-input:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+  .userpick-form-actions { display: flex; gap: 8px; }
+  .userpick-form-btn { flex: 1; text-align: center; padding: 11px; border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
 
   .weekpills { display: flex; gap: 7px; margin-top: 20px; }
   .daybtn { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; transition: all 0.3s; }
@@ -772,6 +778,9 @@ var PROFILES = {
   nava: { label: "Nava", sub: "3 Upper · 1 Pierna", color: "#C8FF00", config: NAVA_CONFIG },
   cristian: { label: "Cristian", sub: "PPL · Recomp", color: "#38BDF8", config: CRISTIAN_CONFIG },
 };
+/* Perfiles "de fábrica" (código) vs. creados por el usuario (persistidos aparte,
+   ver saveCustomProfiles/loadCustomProfiles más abajo). */
+var STATIC_PROFILE_IDS = { nava: true, cristian: true };
 
 /* ============================================================
    MOTOR GENÉRICO DE LA APP — una sola implementación compartida
@@ -1299,21 +1308,149 @@ function paramUser() {
   return m ? m[1] : "";
 }
 
+/* ---------------- Crear una rutina nueva desde cero ----------------
+   Una rutina creada por el usuario es solo otra entrada en PROFILES,
+   con un *_CONFIG generado en blanco (3 días vacíos para que se llenen
+   con "Editar rutina" → "+ Añadir ejercicio"). Se persiste junto al
+   resto de datos (misma tabla/caché que el progreso), como un registro
+   especial, para que aparezca en cualquier dispositivo. */
+var CUSTOM_PROFILES_ID = "__custom_profiles__";
+var customProfilesLoaded = false;
+var creatingProfile = false;
+var NEW_PROFILE_COLORS = ["#C8FF00", "#38BDF8", "#FF6B35", "#E879F9", "#FBBF24", "#34D399", "#A78BFA", "#F472B6"];
+
+function slugifyId(name) {
+  var base = String(name || "").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!base) base = "persona";
+  var id = base, n = 2;
+  while (PROFILES[id]) { id = base + "-" + n; n++; }
+  return id;
+}
+
+/* config.header se persiste con datos planos (titleText); las funciones
+   titleHtml/subtitle no son serializables en JSON, así que se reconstruyen
+   aquí tanto al crear el perfil como al cargarlo desde el registro. */
+function attachHeaderFunctions(config) {
+  var h = config.header;
+  if (typeof h.titleHtml !== "function") {
+    var titleText = h.titleText || config.id.toUpperCase();
+    h.titleHtml = function (accent) { return '<span style="color:' + accent + '">' + esc(titleText) + "</span>"; };
+  }
+  if (typeof h.subtitle !== "function") {
+    h.subtitle = function (weekNumber) { return "Semana " + weekNumber + " de 52"; };
+  }
+  return config;
+}
+
+function buildBlankConfig(id, name, color) {
+  var start = todayISO();
+  var end = new Date();
+  end.setFullYear(end.getFullYear() + 1);
+  var placeholderFocus = 'Pulsa "✎ Editar rutina" y luego "+ Añadir ejercicio" para construir este día desde cero.';
+  var days = ["1", "2", "3"].map(function (n) {
+    return {
+      id: id + "-d" + n, label: "D" + n, fullName: "DÍA " + n, type: "ENTRENO", tag: "General",
+      subtitle: "Añade tus ejercicios", accent: color, bg: "#0a0a0a",
+      focus: placeholderFocus, exercises: [],
+    };
+  });
+  return attachHeaderFunctions({
+    id: id,
+    header: { eyebrow: "RUTINA PERSONALIZADA", titleText: name.toUpperCase() },
+    planPanelLabel: "FASES DE TU PLAN",
+    phases: [
+      { id: 1, name: "Progresión", tag: "Progresión", start: start, end: end.toISOString().slice(0, 10), color: color,
+        desc: "Rutina nueva, todavía sin ejercicios. Entra en \"Editar rutina\" en cada día para añadir los tuyos.",
+        rule: "Sube peso cuando completes las reps de la última serie; si no, repite el mismo. Ve poco a poco." },
+    ],
+    days: days,
+    weekDaysList: [
+      { label: "L", id: days[0].id, active: true },
+      { label: "M", active: false },
+      { label: "X", id: days[1].id, active: true },
+      { label: "J", active: false },
+      { label: "V", id: days[2].id, active: true },
+      { label: "S", active: false },
+      { label: "D", active: false },
+    ],
+    dayIdsByWeekday: { 1: days[0].id, 3: days[1].id, 5: days[2].id },
+    overviewRows: [
+      { day: "Lunes", type: "Día 1", tag: "Personaliza", accent: color },
+      { day: "Martes", type: "Descanso", tag: "", accent: "#222" },
+      { day: "Miércoles", type: "Día 2", tag: "Personaliza", accent: color },
+      { day: "Jueves", type: "Descanso", tag: "", accent: "#222" },
+      { day: "Viernes", type: "Día 3", tag: "Personaliza", accent: color },
+      { day: "Sábado", type: "Descanso", tag: "", accent: "#222" },
+      { day: "Domingo", type: "Descanso", tag: "Recuperación", accent: "#222" },
+    ],
+  });
+}
+
+function serializeCustomProfiles() {
+  var list = [];
+  Object.keys(PROFILES).forEach(function (id) {
+    if (STATIC_PROFILE_IDS[id]) return;
+    var p = PROFILES[id];
+    list.push({ id: id, label: p.label, sub: p.sub, color: p.color, config: p.config });
+  });
+  return { list: list };
+}
+
+function saveCustomProfiles() {
+  SimpleGymStore.save(CUSTOM_PROFILES_ID, serializeCustomProfiles());
+}
+
+async function loadCustomProfiles() {
+  if (customProfilesLoaded) return;
+  customProfilesLoaded = true;
+  try {
+    var data = await SimpleGymStore.load(CUSTOM_PROFILES_ID);
+    var list = (data && data.list) || [];
+    list.forEach(function (p) {
+      if (p && p.id && !PROFILES[p.id]) {
+        PROFILES[p.id] = { label: p.label, sub: p.sub, color: p.color, config: attachHeaderFunctions(p.config) };
+      }
+    });
+  } catch (e) {}
+}
+
 function renderUserPicker() {
   var app = document.getElementById("app");
   var html = '<div class="userpick">' +
     '<div class="eyebrow">SIMPLEGYM</div>' +
-    '<div class="userpick-title">¿Quién entrena hoy?</div>' +
+    '<div class="userpick-title">¿Quién eres?</div>' +
     '<div class="userpick-row">';
   Object.keys(PROFILES).forEach(function (id) {
     var u = PROFILES[id];
     html += '<div class="userpick-btn" style="background:' + u.color + '15;border:1px solid ' + u.color + '55" onclick="chooseUser(\'' + id + '\')">' +
-      '<div style="font-size:18px;font-weight:800;color:' + u.color + '">' + u.label + '</div>' +
-      '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px">' + u.sub + '</div>' +
+      '<div style="font-size:18px;font-weight:800;color:' + u.color + '">' + esc(u.label) + '</div>' +
+      '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px">' + esc(u.sub) + '</div>' +
     '</div>';
   });
-  html += '</div><div class="userpick-note">Se recuerda en este dispositivo. Puedes cambiar de usuario luego desde el pie de la página.</div></div>';
+  if (!creatingProfile) {
+    html += '<div class="userpick-add" onclick="app_showCreateProfile()">+ Añadir rutina</div>';
+  }
+  html += '</div>';
+  if (creatingProfile) {
+    html += '<div class="userpick-form">' +
+      '<input id="new-profile-name" class="userpick-input" placeholder="Nombre de la persona" maxlength="30">' +
+      '<div class="userpick-form-actions">' +
+        '<div class="userpick-form-btn" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5)" onclick="app_cancelCreateProfile()">Cancelar</div>' +
+        '<div class="userpick-form-btn" style="background:#C8FF00;color:#000" onclick="app_createProfile()">Crear rutina</div>' +
+      "</div>" +
+    "</div>";
+  }
+  html += '<div class="userpick-note">Se recuerda en este dispositivo. Puedes cambiar de usuario luego desde el pie de la página.</div></div>';
   app.innerHTML = html;
+  if (creatingProfile) {
+    var inp = document.getElementById("new-profile-name");
+    if (inp) {
+      inp.focus();
+      inp.addEventListener("keydown", function (e) { if (e.key === "Enter") window.app_createProfile(); });
+    }
+  }
 }
 
 window.chooseUser = function (id) {
@@ -1322,10 +1459,31 @@ window.chooseUser = function (id) {
 };
 window.switchUser = function () {
   setStoredUser("");
+  creatingProfile = false;
   renderUserPicker();
+};
+window.app_showCreateProfile = function () {
+  creatingProfile = true;
+  renderUserPicker();
+};
+window.app_cancelCreateProfile = function () {
+  creatingProfile = false;
+  renderUserPicker();
+};
+window.app_createProfile = function () {
+  var inp = document.getElementById("new-profile-name");
+  var name = inp ? inp.value.trim() : "";
+  if (!name) { if (inp) inp.focus(); return; }
+  var id = slugifyId(name);
+  var color = NEW_PROFILE_COLORS[Object.keys(PROFILES).length % NEW_PROFILE_COLORS.length];
+  PROFILES[id] = { label: name, sub: "Rutina nueva", color: color, config: buildBlankConfig(id, name, color) };
+  saveCustomProfiles();
+  creatingProfile = false;
+  window.chooseUser(id);
 };
 
 async function boot(forceUser) {
+  await loadCustomProfiles();
   var user = forceUser || paramUser() || getStoredUser();
   if (!user || !PROFILES[user]) { renderUserPicker(); return; }
   setStoredUser(user);

@@ -106,6 +106,9 @@
   .editbtn { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; padding: 8px 14px; border-radius: 10px; cursor: pointer; }
   .exname-input { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18); color: #fff; border-radius: 7px; padding: 5px 8px; width: 100%; min-width: 0; }
   .exname-input:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+  .muscle-select { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 11px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18); color: #fff; border-radius: 7px; padding: 5px 8px; }
+  .restday-note { margin: 10px 20px 0; padding: 10px 12px; background: rgba(255,255,255,0.04); border-radius: 10px; font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.5; }
+  .restday-note b { color: #fff; }
   .pyhead-edit { display: grid; grid-template-columns: 34px 1fr 1fr 30px; gap: 6px; padding: 7px 14px; background: rgba(0,0,0,0.2); font-size: 8px; font-weight: 700; letter-spacing: 2px; color: rgba(255,255,255,0.2); }
   .pyrow-edit { display: grid; grid-template-columns: 34px 1fr 1fr 30px; gap: 6px; padding: 7px 14px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.04); }
   .pyrow-edit:last-of-type { border-bottom: none; }
@@ -282,6 +285,35 @@ function formatDateEs(iso) {
 function round(n) { return Math.round(n * 100) / 100; }
 
 /* ============================================================
+   MOTOR DE PERIODIZACIÓN — la fase (calculada por fecha) decide
+   cuántas series, cuántas reps y qué % del peso de fuerza se
+   muestran. No hay que escribir 52 semanas a mano: son fórmulas
+   sobre el mismo dato base (baseTop/repsPattern/offsets).
+   ============================================================ */
+var PHASE_PROFILES = {
+  "Progresión":       { key: "fuerza",        label: "Fuerza",        repsMult: 1,   weightMult: 1,    setsDelta: 0 },
+  "Volumen":          { key: "hipertrofia",   label: "Hipertrofia",   repsMult: 1.6, weightMult: 0.8,  setsDelta: 1 },
+  "Recuperación":     { key: "descarga",      label: "Descarga",      repsMult: 1,   weightMult: 0.88, setsDelta: -1 },
+  "Mantenimiento":    { key: "mantenimiento", label: "Mantenimiento", repsMult: 1,   weightMult: 1,    setsDelta: 0 },
+  "Test de progreso": { key: "test",          label: "Test",          repsMult: 0.7, weightMult: 1.05, setsDelta: -1 },
+};
+function getPhaseProfile(tag) { return PHASE_PROFILES[tag] || PHASE_PROFILES["Progresión"]; }
+var currentProfile = getPhaseProfile(getPhase(todayISO()).tag);
+
+function trainingDayForToday() {
+  var map = { 1: "lunes", 2: "martes", 4: "jueves", 5: "viernes" };
+  return map[new Date().getDay()] || null;
+}
+function nextTrainingDay(fromJsDay) {
+  var map = { 1: "lunes", 2: "martes", 4: "jueves", 5: "viernes" };
+  for (var add = 1; add <= 7; add++) {
+    var d = (fromJsDay + add) % 7;
+    if (map[d]) return map[d];
+  }
+  return "lunes";
+}
+
+/* ============================================================
    RUTINA — 3 upper + 1 pierna. Cada ejercicio "trackable" lleva
    su propia progresión: offsets = diferencia en kg de cada serie
    respecto a la última (la que registras cada sesión).
@@ -423,6 +455,57 @@ var muscleColors = {
   "Gemelos": "#34D399", "Core": "#94A3B8",
 };
 
+/* ============================================================
+   BIBLIOTECA DE EJERCICIOS — al elegir uno de esta lista al
+   renombrar, el grupo muscular se actualiza solo. También se
+   puede fijar el grupo muscular a mano con el selector.
+   ============================================================ */
+var EXERCISE_LIBRARY = [
+  { name: "Press Banca Barra", muscle: "Pecho" },
+  { name: "Press Banca Mancuerna", muscle: "Pecho" },
+  { name: "Press Inclinado Mancuerna", muscle: "Pecho sup." },
+  { name: "Cruces Polea Baja", muscle: "Pecho sup." },
+  { name: "Aperturas en Máquina (Pec-Deck)", muscle: "Pecho" },
+  { name: "Jalón al Pecho (agarre neutro)", muscle: "Espalda" },
+  { name: "Remo en Máquina (pecho apoyado)", muscle: "Espalda" },
+  { name: "Remo Mancuerna 1 mano", muscle: "Espalda" },
+  { name: "Pullover en Polea Alta", muscle: "Espalda" },
+  { name: "Dominadas", muscle: "Espalda" },
+  { name: "Remo en Barra (Pendlay)", muscle: "Espalda" },
+  { name: "Press Militar Barra (de pie)", muscle: "Hombro" },
+  { name: "Press Arnold (sentado)", muscle: "Hombro" },
+  { name: "Vuelos Laterales Mancuerna", muscle: "Hombro lat." },
+  { name: "Vuelos Laterales (polea baja)", muscle: "Hombro lat." },
+  { name: "Face Pull Polea", muscle: "Hombro post." },
+  { name: "Curl Barra EZ", muscle: "Bíceps" },
+  { name: "Curl Predicador (barra EZ)", muscle: "Bíceps" },
+  { name: "Curl Martillo con Cuerda (polea)", muscle: "Bíceps" },
+  { name: "Fondos en Paralelas", muscle: "Tríceps" },
+  { name: "Extensiones Tríceps Polea", muscle: "Tríceps" },
+  { name: "Patada de Tríceps (mancuerna)", muscle: "Tríceps" },
+  { name: "Press Francés", muscle: "Tríceps" },
+  { name: "Sentadilla Libre", muscle: "Cuádriceps" },
+  { name: "Prensa Inclinada", muscle: "Cuádriceps" },
+  { name: "Extensión Cuádriceps (máquina)", muscle: "Cuádriceps" },
+  { name: "Zancadas con Mancuernas", muscle: "Cuádriceps" },
+  { name: "Peso Muerto Rumano", muscle: "Isquios" },
+  { name: "Curl Femoral Tumbado", muscle: "Isquios" },
+  { name: "Hip Thrust", muscle: "Isquios" },
+  { name: "Gemelos de Pie (máquina)", muscle: "Gemelos" },
+  { name: "Plancha", muscle: "Core" },
+  { name: "Rueda Abdominal", muscle: "Core" },
+  { name: "Crunch en Polea Alta", muscle: "Core" },
+];
+function findLibraryExercise(name) {
+  var n = String(name || "").toLowerCase().trim();
+  return EXERCISE_LIBRARY.filter(function (e) { return e.name.toLowerCase() === n; })[0] || null;
+}
+function muscleOptions(current) {
+  return Object.keys(muscleColors).map(function (m) {
+    return '<option value="' + esc(m) + '"' + (m === current ? " selected" : "") + ">" + esc(m) + "</option>";
+  }).join("");
+}
+
 var CHECK_SVG = '<svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 var CHEVRON_SVG = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4.5L6 8L10 4.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -463,9 +546,20 @@ function getPyramid(ex, prog) {
   if (!ex.trackable) return ex.staticPyramid;
   var entry = prog.exercises[ex.id];
   var top = entry ? entry.top : ex.baseTop;
-  return ex.repsPattern.map(function (reps, i) {
-    return { set: i + 1, reps: reps, weight: round(top + ex.offsets[i]) + " kg" };
+  var base = ex.repsPattern.map(function (reps, i) {
+    return { reps: reps, weight: top + ex.offsets[i] };
   });
+  var profile = currentProfile;
+  var rows = base.map(function (r) {
+    return { reps: Math.max(1, Math.round(r.reps * profile.repsMult)), weight: round(r.weight * profile.weightMult) };
+  });
+  if (profile.setsDelta > 0) {
+    var first = rows[0];
+    rows.unshift({ reps: Math.round(first.reps * 1.3), weight: round(first.weight * 0.85) });
+  } else if (profile.setsDelta < 0 && rows.length > 2) {
+    rows.shift();
+  }
+  return rows.map(function (r, i) { return { set: i + 1, reps: r.reps, weight: r.weight + " kg" }; });
 }
 
 function findExercise(exId) {
@@ -478,7 +572,7 @@ function findExercise(exId) {
 }
 
 /* ---------------- STATE ---------------- */
-var activeDay = "lunes";
+var activeDay = trainingDayForToday() || nextTrainingDay(new Date().getDay());
 var checked = {};
 var expanded = {};
 var progress = normalize(initialData);
@@ -508,7 +602,7 @@ function getDisplayData(item, prog) {
   if (ov) {
     return {
       name: ov.name,
-      muscle: (item.base && item.base.muscle) || "Core",
+      muscle: ov.muscle || (item.base && item.base.muscle) || "Core",
       note: item.base ? item.base.note : "Ejercicio añadido por ti.",
       pyramid: ov.sets.map(function (s, i) { return { set: i + 1, reps: s.reps, weight: s.weight }; }),
       trackable: false,
@@ -525,10 +619,11 @@ function ensureOverride(key) {
       var basePyramid = getPyramid(ex, progress);
       progress.overrides[key] = {
         name: ex.name,
+        muscle: ex.muscle,
         sets: basePyramid.map(function (p) { return { reps: String(p.reps), weight: String(p.weight) }; }),
       };
     } else {
-      progress.overrides[key] = { name: "Nuevo ejercicio", sets: [{ reps: "10", weight: "0 kg" }] };
+      progress.overrides[key] = { name: "Nuevo ejercicio", muscle: "Core", sets: [{ reps: "10", weight: "0 kg" }] };
     }
   }
   return progress.overrides[key];
@@ -539,6 +634,15 @@ function nava_toggleEditMode() { editMode = !editMode; render(); }
 function nava_updateExerciseName(key, value) {
   var ov = ensureOverride(key);
   ov.name = value;
+  var match = findLibraryExercise(value);
+  if (match) ov.muscle = match.muscle;
+  saveProgress(progress);
+  render();
+}
+
+function nava_updateExerciseMuscle(key, value) {
+  var ov = ensureOverride(key);
+  ov.muscle = value;
   saveProgress(progress);
   render();
 }
@@ -619,15 +723,24 @@ function nava_saveLog(exId) {
   var w = parseFloat(String(wEl.value).replace(",", "."));
   var r = parseInt(rEl.value, 10);
   if (isNaN(w) || isNaN(r)) { showToast("Revisa los números introducidos."); return; }
-  var targetReps = ex.repsPattern[ex.repsPattern.length - 1];
-  var reached = r >= targetReps;
-  var newTop = reached ? round(w + ex.step) : round(w);
   var prevEntry = progress.exercises[ex.id] || { top: ex.baseTop, history: [] };
+  var pyramid = getPyramid(ex, progress);
+  var targetReps = pyramid[pyramid.length - 1].reps;
+  var reached = r >= targetReps;
+  var canProgress = currentProfile.key === "fuerza" || currentProfile.key === "test";
+  var newTop = prevEntry.top;
+  var msg;
+  if (canProgress) {
+    newTop = reached ? round(w + ex.step) : round(w);
+    msg = reached ? "Guardado ✓ Próxima vez: " + newTop + " kg" : "Guardado ✓ Repetimos " + newTop + " kg la próxima";
+  } else {
+    msg = "Guardado ✓ (fase de " + currentProfile.label.toLowerCase() + " — el peso de fuerza no cambia, solo queda en tu historial)";
+  }
   var newHistory = (prevEntry.history || []).concat([{ date: todayISO(), weight: w, reps: r }]).slice(-10);
   progress.exercises[ex.id] = { top: newTop, history: newHistory };
   saveProgress(progress);
   editingId = null;
-  showToast(reached ? "Guardado ✓ Próxima vez: " + newTop + " kg" : "Guardado ✓ Repetimos " + newTop + " kg la próxima");
+  showToast(msg);
 }
 
 function nava_handleReset() {
@@ -694,6 +807,13 @@ function render() {
     html += "</div>";
   }
 
+  var todayTrainDay = trainingDayForToday();
+  if (!todayTrainDay) {
+    var nxtId = nextTrainingDay(new Date().getDay());
+    var nxtDay = days.filter(function (d) { return d.id === nxtId; })[0];
+    html += '<div class="restday-note">Hoy es día de descanso. Tu próximo entreno: <b>' + nxtDay.fullName + " · " + nxtDay.type + "</b></div>";
+  }
+
   html += '<div class="weekpills">';
   weekDaysList.forEach(function (w) {
     var isActive = w.id === activeDay;
@@ -713,6 +833,8 @@ function render() {
         '<span class="t1" style="color:' + day.accent + '">' + day.type + "</span>" +
         '<span class="sep" style="background:' + day.accent + '"></span>' +
         '<span class="t2" style="color:' + day.accent + '">' + day.tag.toUpperCase() + "</span>" +
+        '<span class="sep" style="background:' + day.accent + '"></span>' +
+        '<span class="t2" style="color:' + currentPhase.color + '">MODO ' + currentProfile.label.toUpperCase() + "</span>" +
       "</div>" +
       '<div class="dayname">' + day.fullName + "</div>" +
       '<div class="daysub">' + day.subtitle + "</div>" +
@@ -727,6 +849,7 @@ function render() {
   "</div></div>";
 
   /* exercises */
+  html += '<datalist id="exlib-list">' + EXERCISE_LIBRARY.map(function (e) { return '<option value="' + esc(e.name) + '">'; }).join("") + "</datalist>";
   html += '<div class="exlist">';
   effList.forEach(function (item) {
     var key = item.key;
@@ -747,7 +870,10 @@ function render() {
         '<div class="exinfo" onclick="nava_toggleExpand(\'' + key + '\')">' +
           (editMode ?
             '<div class="exname-row">' +
-              '<input class="exname-input" value="' + esc(data.name) + '" onchange="nava_updateExerciseName(\'' + key + '\', this.value)" onclick="event.stopPropagation()">' +
+              '<input list="exlib-list" class="exname-input" value="' + esc(data.name) + '" onchange="nava_updateExerciseName(\'' + key + '\', this.value)" onclick="event.stopPropagation()">' +
+            "</div>" +
+            '<div class="exname-row" style="margin-top:6px">' +
+              '<select class="muscle-select" onchange="nava_updateExerciseMuscle(\'' + key + '\', this.value)" onclick="event.stopPropagation()">' + muscleOptions(data.muscle) + "</select>" +
               '<span class="muscletag" style="background:' + mc + "20;color:" + mc + '">' + esc(data.muscle).toUpperCase() + "</span>" +
             "</div>"
             :
@@ -802,9 +928,9 @@ function render() {
         } else {
           html += '<div class="logform-row">' +
             '<div class="logform-col"><div class="logform-label">PESO (KG)</div>' +
-              '<input id="inp-weight" class="numin" type="number" inputmode="decimal" step="0.5" value="' + entry.top + '"></div>' +
+              '<input id="inp-weight" class="numin" type="number" inputmode="decimal" step="0.5" value="' + parseFloat(pyramid[pyramid.length - 1].weight) + '"></div>' +
             '<div class="logform-col"><div class="logform-label">REPS EN LA ÚLTIMA SERIE</div>' +
-              '<input id="inp-reps" class="numin" type="number" inputmode="numeric" step="1" value="' + item.base.repsPattern[item.base.repsPattern.length - 1] + '"></div>' +
+              '<input id="inp-reps" class="numin" type="number" inputmode="numeric" step="1" value="' + pyramid[pyramid.length - 1].reps + '"></div>' +
           "</div>" +
           '<div class="logform-actions">' +
             '<div class="logform-btn" style="background:' + day.accent + ';color:#000" onclick="nava_saveLog(\'' + key + '\')">Guardar</div>' +
@@ -850,7 +976,11 @@ function render() {
   var ruleText = currentPhase.tag === "Mantenimiento"
     ? "Estás en fase de mantenimiento. No busques subir peso: repite lo que puedas, con buena técnica, sin agobios."
     : currentPhase.tag === "Recuperación"
-    ? "Semana de descarga: baja el peso ~10% o quita una serie por ejercicio. Es parte del plan, no un retroceso."
+    ? "Semana de descarga: los pesos y series de abajo YA están reducidos automáticamente (~12% menos peso, una serie menos). Es parte del plan, no un retroceso."
+    : currentPhase.tag === "Volumen"
+    ? "Bloque de hipertrofia: más reps y algo menos de peso, ya calculado automáticamente. Descansa 60–90 seg y prioriza sentir el músculo."
+    : currentPhase.tag === "Test de progreso"
+    ? "Semana de test: pesos algo más altos, menos series. Prueba tus máximos con calma y buena técnica."
     : 'Cuando completes todas las reps de la última serie → pulsa "Registrar" y sube el peso. Sin llegar al tope, repite el mismo peso. Así de simple.';
 
   html += '<div class="rulebox" style="background:' + day.accent + "10;border:1px solid " + day.accent + '25">' +
@@ -874,6 +1004,7 @@ function render() {
   window.nava_toggleExpand = nava_toggleExpand;
   window.nava_toggleEditMode = nava_toggleEditMode;
   window.nava_updateExerciseName = nava_updateExerciseName;
+  window.nava_updateExerciseMuscle = nava_updateExerciseMuscle;
   window.nava_updateSetField = nava_updateSetField;
   window.nava_removeSet = nava_removeSet;
   window.nava_addSet = nava_addSet;

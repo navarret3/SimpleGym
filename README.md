@@ -8,6 +8,20 @@ App de rutinas de gimnasio para dos personas (Nava y Cristian), en un único `in
 - Los pesos, el registro de cada sesión y las ediciones de rutina (nombre, series, reps, ejercicios añadidos/eliminados) se guardan **siempre en local** (`localStorage`), así que funciona sin conexión.
 - Si configuras Supabase (ver abajo), además esos mismos datos se sincronizan en la nube: entras desde el móvil o el portátil y ves el mismo progreso.
 
+### Plan de Nava: periodización automática por fecha
+
+El plan de Nava está dividido en 12 fases a lo largo de un año (fuerza, hipertrofia, descarga, mantenimiento, test), cada una con fechas concretas. La app:
+
+- Detecta la fecha de hoy y muestra automáticamente **el entrenamiento del día** al entrar (si hoy toca descanso, avisa cuál es el próximo entreno).
+- Calcula solo, según la fase activa, las series/reps/peso de cada ejercicio a partir del mismo dato base (peso de fuerza actual): en hipertrofia añade una serie y sube las reps bajando el peso, en descarga quita una serie y baja el peso ~12%, en semana de test sube ligeramente el peso con menos series. Se ve en la etiqueta "MODO ..." de cada día.
+- El registro de peso ("Registrar lo que hiciste hoy") solo hace subir el peso de referencia durante las fases de fuerza/test — en las demás fases queda guardado en tu historial pero no mueve el peso base, tal y como indica el mensaje de cada fase.
+
+Esto es un motor de reglas (periodización por bloques), no una IA generativa en vivo: no hay ninguna llamada a un servicio de IA desde el navegador (evita exponer una API key en código público).
+
+### Editar rutina: biblioteca de ejercicios
+
+Al pulsar "Editar rutina", el nombre del ejercicio tiene autocompletado con una biblioteca de ejercicios habituales — si eliges uno de la lista, el grupo muscular se actualiza solo. También puedes fijar el grupo muscular a mano con el selector de al lado, así el banner de color siempre es correcto aunque escribas un nombre que no esté en la biblioteca.
+
 ## Activar sincronización real (Supabase)
 
 1. Crea un proyecto gratuito en [supabase.com](https://supabase.com).
@@ -45,6 +59,8 @@ Al no haber login, cualquiera que tenga la `anon key` (visible en el código fue
 
 ## Ideas para seguir mejorando
 
+- Aplicar el mismo motor de periodización + biblioteca de ejercicios al plan de Cristian (por ahora solo está en el de Nava).
 - Login real por usuario (Supabase Auth) en vez del selector simple.
 - Historial y gráficas de progreso por ejercicio (ya se guarda el historial de las últimas 10 sesiones, solo falta visualizarlo).
 - Notificaciones/recordatorios de entrenamiento.
+

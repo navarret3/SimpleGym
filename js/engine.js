@@ -55,9 +55,40 @@ function initProfileApp(profile, initialData) {
       order: parsed.order || {},
       schedule: parsed.schedule || {},
       session: parsed.session && parsed.session.date === today ? parsed.session : def.session,
+      planVersion: parsed.planVersion || 1,
+      reentryAt: parsed.reentryAt || "",
     };
     migrateFrozenOverrides(p);
+    upgradePlan(p, parsed);
     return p;
+  }
+
+  /* Cuando un perfil cambia de plan (profile.planVersion), los pesos guardados del plan
+     anterior se convierten al nuevo rango de reps con la fórmula de Epley: se estima el
+     máximo de una repetición con la serie pesada antigua (legacyTopReps) y se calcula el
+     peso para repsMin + 1 reps. Así no pierdes tu progreso al cambiar de pirámide a rango. */
+  function upgradePlan(p, parsed) {
+    var target = profile.planVersion || 1;
+    if (p.planVersion >= target) return;
+    var hadData = parsed.exercises && Object.keys(parsed.exercises).length;
+    if (hadData) {
+      days.forEach(function (day) {
+        day.exercises.forEach(function (ex) {
+          if (!ex.trackable || !ex.legacyTopReps) return;
+          var frozen = p.schemes[ex.id];
+          var cur = frozen ? p.exercises[ex.id] : parsed.exercises[ex.id];
+          if (!cur || !(cur.top > 0)) return;
+          var oldReps = frozen ? frozen.repsPattern[frozen.repsPattern.length - 1] : ex.legacyTopReps;
+          var est1rm = cur.top * (1 + oldReps / 30);
+          var top = Math.round(est1rm / (1 + (ex.repsPattern[0] + 1) / 30) / ex.step) * ex.step;
+          p.exercises[ex.id] = { top: round(top), history: cur.history || [], deloadAt: cur.deloadAt };
+        });
+      });
+    }
+    // los esquemas y el orden del plan anterior ya no corresponden a los ejercicios nuevos
+    days.forEach(function (day) { day.exercises.forEach(function (ex) { delete p.schemes[ex.id]; }); });
+    p.order = {};
+    p.planVersion = target;
   }
 
   function saveProgress(p) {
@@ -566,6 +597,43 @@ function initProfileApp(profile, initialData) {
     input.click();
   }
 
+  /* Tras 10+ días sin registrar entrenos (vacaciones, enfermedad…) se propone volver con
+     menos peso. En las fases de descarga/parada no se avisa: ya bajan el peso solas. */
+  function lastTrainingDate() {
+    var last = "";
+    Object.keys(progress.exercises).forEach(function (k) {
+      var h = progress.exercises[k].history;
+      if (h && h.length && h[h.length - 1].date > last) last = h[h.length - 1].date;
+    });
+    return last;
+  }
+
+  function reentryInfo() {
+    var last = lastTrainingDate();
+    if (!last) return null;
+    if (progress.reentryAt && progress.reentryAt >= last) return null;
+    var gap = Math.round((new Date(todayISO() + "T00:00:00") - new Date(last + "T00:00:00")) / 86400000);
+    if (gap < 10) return null;
+    var tag = getPhase(phases, todayISO()).tag;
+    if (tag === "Recuperación" || tag === "Mantenimiento") return null;
+    return { days: gap, pct: gap >= 21 ? 15 : 10 };
+  }
+
+  function app_applyReentry() {
+    var info = reentryInfo();
+    if (!info) return;
+    Object.keys(progress.exercises).forEach(function (k) {
+      var e = progress.exercises[k];
+      var scheme = getScheme(k, progress);
+      if (!scheme || !(e.top > 0)) return;
+      var step = scheme.step || 2.5;
+      e.top = round(Math.max(step, Math.round(e.top * (1 - info.pct / 100) / step) * step));
+    });
+    progress.reentryAt = todayISO();
+    saveProgress(progress);
+    showToast("Pesos base reducidos un " + info.pct + " %. Súbelos de nuevo en pocas sesiones.");
+  }
+
   function app_applyDeload(key) {
     var e = progress.exercises[key];
     if (!e) return;
@@ -642,6 +710,12 @@ function initProfileApp(profile, initialData) {
         "</div>";
       });
       html += "</div>";
+    }
+
+    var reentry = reentryInfo();
+    if (reentry) {
+      html += '<div class="stallbox" style="margin:12px 20px 0"><div>⏸ Llevas ' + reentry.days + ' días sin registrar entrenos. Para volver sin agujetas ni lesiones, baja los pesos un ' + reentry.pct + ' % y súbelos de nuevo en pocas sesiones.</div>' +
+        '<div class="stallbtn" onclick="app_applyReentry()">Bajar pesos un ' + reentry.pct + ' %</div></div>';
     }
 
     var todayTrainDay = trainingDayForToday(dayMap());
@@ -826,7 +900,7 @@ function initProfileApp(profile, initialData) {
         '<div class="setbar"><div class="setfill" style="width:' + Math.min(100, Math.round(m.sets / 24 * 100)) + "%;background:" + color + '"></div></div>' +
         '<span class="setnum" style="color:' + color + '">' + m.sets + "</span></div>";
     });
-    html += '<div class="overtag" style="display:block;margin-top:10px;line-height:1.5">Para ganar músculo, la evidencia apunta a ~10–20 series por músculo y semana (naranja: te quedas corto · amarillo: de más).</div></div>';
+    html += '<div class="overtag" style="display:block;margin-top:10px;line-height:1.5">Para ganar músculo, la evidencia apunta a ~10–20 series por músculo y semana (naranja: te quedas corto · amarillo: de más). Cuenta solo series directas: los básicos también trabajan hombro, tríceps o glúteo.</div></div>';
 
     /* progression rule */
     var ruleText = currentPhase.rule || (
@@ -875,6 +949,7 @@ function initProfileApp(profile, initialData) {
   window.app_restoreRemoved = app_restoreRemoved;
   window.app_moveExercise = app_moveExercise;
   window.app_applyDeload = app_applyDeload;
+  window.app_applyReentry = app_applyReentry;
   window.app_exportData = app_exportData;
   window.app_importData = app_importData;
   window.app_setDayWeekday = app_setDayWeekday;

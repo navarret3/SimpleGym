@@ -74,6 +74,14 @@ Al no haber login, cualquiera que tenga la `anon key` (visible en el código fue
 - **Sincronización más segura**: si dos dispositivos registran por separado, se combinan los historiales en vez de pisarse; lo que no se pudo subir se reenvía al volver la conexión; el pie de la página indica el estado. Copia de seguridad: "Exportar datos" / "Importar datos" (JSON por perfil).
 - **PWA**: `manifest.webmanifest` + `sw.js` (offline). Sube `CACHE_VERSION` en `sw.js` en cada release para que los móviles recojan los cambios.
 
+## Plan de Nava (v2): Torso / Pierna ×4, octubre 2026 → junio 2027
+
+- **Semana:** lunes Torso A (fuerza), martes Pierna A (fuerza), jueves Torso B (hipertrofia), viernes Torso C (4º día, opcional: hombro, espalda alta y brazos, más dos ejercicios de pierna residual). El tren superior entra 3 veces por semana y la pierna 1 (+ residual).
+- **Progresión:** doble progresión por rango de reps (6–10 en básicos, 8–12 y 10–15 en accesorios, 12–20 en laterales y gemelos).
+- **Calendario (12 fases):** bloques de 5–6 semanas con descarga entre ellos, parada de Navidad (21 dic–3 ene), semana de reentrada (−12 % de peso y una serie menos), un bloque de volumen en marzo-abril (+1 serie por ejercicio) y un bloque final de pico en junio.
+- **Cambio desde el plan antiguo:** tus pesos guardados (serie pesada de 4–6 reps) se convierten automáticamente al nuevo rango con la fórmula de Epley y se conserva el historial. Los ejercicios nuevos (remo abierto en polea, pec-deck, laterales en máquina, extensión sobre la cabeza, curl femoral sentado) arrancan en "Elige peso".
+- **Vacaciones sueltas:** si pasas 10+ días sin registrar entrenos, la app propone bajar los pesos un 10 % (15 % a partir de 21 días) y volver a subir.
+
 ## Estructura del proyecto
 
 | Archivo | Contenido |
@@ -84,7 +92,7 @@ Al no haber login, cualquiera que tenga la `anon key` (visible en el código fue
 | `js/timer.js` | Temporizador de descanso |
 | `js/library.js` | Músculos, biblioteca de ejercicios y alternativas |
 | `js/builders.js` | Plantillas de rutina y creación de perfiles |
-| `js/data-nava.js`, `js/profiles.js` | Rutina de Nava y registro de perfiles |
+| `js/data-nava.js`, `js/profiles.js` | Rutina de Nava (plan v2) y registro de perfiles |
 | `js/engine.js` | Motor genérico: progresión, edición, sesión del día, render |
 | `js/app.js` | Selector de perfil y arranque |
 | `tests/run.js` | Tests de la lógica (sin dependencias) |
@@ -95,5 +103,4 @@ Para probar la lógica: `node tests/run.js`. Para ver la app en local, sirve la 
 
 - Supabase Auth con RLS por usuario (hoy no hay login; ver la nota de seguridad). Exige configurar el proyecto de Supabase y cambiar las políticas, así que se deja como decisión aparte.
 - Añadir o quitar días de entreno y editar las fases desde la interfaz (hoy se pueden mover de día de la semana, no crear días nuevos).
-- Convertir la rutina de Nava a Torso/Pierna 4 días con doble progresión (hoy sigue con su pirámide de 3 torso + 1 pierna).
 - Notificaciones/recordatorios de entrenamiento.

@@ -22,7 +22,7 @@ var RestTimer = (function () {
     if (t) t.textContent = l > 0 ? fmt(l) : "¡A por la siguiente!";
     if (l === 0 && !finished) {
       finished = true;
-      try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (err) {}
+      try { if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate([200, 100, 200]); } catch (err) {}
     }
   }
 

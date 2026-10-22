@@ -85,8 +85,9 @@ test("dateISO usa la fecha local, no UTC", function () {
 
 test("getPhase detecta la fase de Nava por fecha", function () {
   var ctx = freshApp();
-  assert.strictEqual(vm.runInContext('getPhase(NAVA_CONFIG.phases, "2026-10-21").tag', ctx), "Volumen");
-  assert.strictEqual(vm.runInContext('getPhase(NAVA_CONFIG.phases, "2026-10-15").tag', ctx), "Recuperación");
+  assert.strictEqual(vm.runInContext('getPhase(NAVA_CONFIG.phases, "2027-03-10").tag', ctx), "Volumen");
+  assert.strictEqual(vm.runInContext('getPhase(NAVA_CONFIG.phases, "2026-12-01").tag', ctx), "Recuperación");
+  assert.strictEqual(vm.runInContext('getPhase(NAVA_CONFIG.phases, "2026-12-25").tag', ctx), "Mantenimiento");
 });
 
 test("buildCyclePhases: 52 semanas contiguas, descarga cada 6ª", function () {
@@ -137,9 +138,11 @@ test("migra overrides congelados a esquema vivo y conserva el progreso", functio
   ctx.app_setActiveDay("lunes");
   ctx.app_toggleCheck("lun-press-banca");
   var d = saved(ctx);
-  assert.deepStrictEqual(d.schemes["lun-press-banca"], { repsPattern: [12, 8, 4], offsets: [-20, -12.5, 0] });
-  assert.strictEqual(d.exercises["lun-press-banca"].top, 70);
+  // el plan v2 sustituye el esquema por el rango de reps y convierte el peso (70 kg a 4 reps -> ~65 kg para 6-10)
+  assert.ok(!d.schemes["lun-press-banca"]);
+  assert.strictEqual(d.exercises["lun-press-banca"].top, 65);
   assert.ok(!d.overrides["lun-press-banca"].sets);
+  assert.strictEqual(d.planVersion, 2);
 });
 
 test("se puede registrar en ejercicios de peso corporal y personalizados", function () {
@@ -156,8 +159,8 @@ test("se puede registrar en ejercicios de peso corporal y personalizados", funct
   setLog(ctx, 30, 16);
   ctx.app_saveLog(id);
   var e = saved(ctx).exercises[id];
-  // hipertrofia: 30 kg mostrados = base 37.5; 16 reps = objetivo (10 x 1.6) -> sube un escalón de 2.5
-  assert.strictEqual(e.top, 40);
+  // fase de progresión: 30 kg = base; 16 reps supera el objetivo (10) -> sube un escalón de 2.5
+  assert.strictEqual(e.top, 32.5);
 });
 
 test("editar a mano no congela: el peso registrado sigue moviendo el peso base", function () {
@@ -165,22 +168,22 @@ test("editar a mano no congela: el peso registrado sigue moviendo el peso base",
   ctx.app_setActiveDay("lunes");
   ctx.app_updateSetField("lun-jalon-pecho", 0, "weight", "20");
   var d = saved(ctx);
-  assert.strictEqual(d.schemes["lun-jalon-pecho"].offsets[0], -47);
+  assert.strictEqual(d.schemes["lun-jalon-pecho"].offsets[0], -37.5); // 20 kg frente a 57.5 de peso base
   ctx.app_toggleExpand("lun-jalon-pecho");
   setLog(ctx, 70, 4);
   ctx.app_saveLog("lun-jalon-pecho");
   d = saved(ctx);
-  // hipertrofia: peso mostrado = base * 0.8 -> base = 87.5; reps objetivo 6 > 4 -> no sube escalón
-  assert.strictEqual(d.exercises["lun-jalon-pecho"].top, 87.5);
+  // fase de progresión: peso mostrado = base; 4 reps < 12 objetivo -> no sube escalón
+  assert.strictEqual(d.exercises["lun-jalon-pecho"].top, 70);
 });
 
 test("la descarga no modifica el peso base", function () {
-  var ctx = freshApp(null, "2026-10-15T12:00:00");
+  var ctx = freshApp(null, "2026-12-01T12:00:00"); // semana de descarga
   ctx.app_setActiveDay("lunes");
   ctx.app_toggleExpand("lun-press-banca");
-  setLog(ctx, 50, 12);
+  setLog(ctx, 50, 10);
   ctx.app_saveLog("lun-press-banca");
-  assert.strictEqual(saved(ctx).exercises["lun-press-banca"].top, 65);
+  assert.strictEqual(saved(ctx).exercises["lun-press-banca"].top, 60);
 });
 
 test("los checks del día persisten y caducan al cambiar de fecha", function () {
@@ -262,7 +265,7 @@ test("escribir un rango en el modo edición convierte el ejercicio a doble progr
   ctx.app_updateSetField("lun-press-banca", 0, "reps", "6-10");
   var s = saved(ctx).schemes["lun-press-banca"];
   assert.strictEqual(s.repMax, 10);
-  assert.deepStrictEqual(s.repsPattern, [6, 6, 6, 6]);
+  assert.deepStrictEqual(s.repsPattern, [6, 6, 6]);
 });
 
 
@@ -316,6 +319,51 @@ test("un perfil nuevo no lee la clave antigua de otra persona", function () {
   ctx.localStorage.setItem("gymAmigoProgresoV1", JSON.stringify({ exercises: { x: 1 } }));
   load(ctx, ["store"]);
   return vm.runInContext('SimpleGymStore.load("otra-persona")', ctx).then(function (v) { assert.strictEqual(v, null); });
+});
+
+
+/* ---------- plan v2 de Nava ---------- */
+test("el plan de Nava es coherente: ids únicos, músculos válidos y fases contiguas", function () {
+  var ctx = freshApp();
+  var r = JSON.parse(vm.runInContext('(function(){ var ids = {}, bad = [];' +
+    ' NAVA_CONFIG.days.forEach(function(d){ d.exercises.forEach(function(e){ if (ids[e.id]) bad.push("dup " + e.id); ids[e.id] = 1; if (!muscleColors[e.muscle]) bad.push("musculo " + e.muscle); if (e.trackable && (!e.repMax || e.repMax < e.repsPattern[0])) bad.push("rango " + e.id); }); });' +
+    ' var gaps = []; NAVA_CONFIG.phases.forEach(function(p, i){ if (i) { var g = (new Date(p.start + "T00:00:00") - new Date(NAVA_CONFIG.phases[i-1].end + "T00:00:00")) / 86400000; if (g !== 1) gaps.push(p.name); } });' +
+    ' return JSON.stringify({ bad: bad, gaps: gaps, start: NAVA_CONFIG.phases[0].start, end: NAVA_CONFIG.phases[NAVA_CONFIG.phases.length-1].end, days: NAVA_CONFIG.days.length }); })()', ctx));
+  assert.deepStrictEqual(r.bad, []);
+  assert.deepStrictEqual(r.gaps, []);
+  assert.strictEqual(r.start, "2026-10-22");
+  assert.strictEqual(r.end, "2027-06-30");
+  assert.strictEqual(r.days, 4);
+});
+
+test("cambio de plan: convierte tus pesos antiguos una sola vez y no toca ejercicios sin historial", function () {
+  var old = { exercises: { "lun-press-banca": { top: 65, history: [{ date: "2026-10-12", weight: 65, reps: 4 }] }, "jue-sentadilla": { top: 100, history: [] } }, overrides: {}, removed: {}, custom: {}, order: { lunes: ["lun-fondos"] } };
+  var ctx = freshApp(old);
+  ctx.app_setActiveDay("lunes");
+  ctx.app_toggleCheck("lun-press-banca");
+  var d = saved(ctx);
+  assert.strictEqual(d.exercises["lun-press-banca"].top, 60, "65 kg x 4 reps -> 60 kg para 7 reps");
+  assert.strictEqual(d.exercises["jue-sentadilla"].top, 95);
+  assert.strictEqual(d.exercises["lun-press-banca"].history.length, 1, "se conserva el historial");
+  assert.strictEqual(d.exercises["mar-pullover"].top, 27.5, "sin datos previos: peso inicial del plan");
+  assert.deepStrictEqual(d.order, {}, "el orden antiguo se reinicia");
+  var ctxAgain = freshApp(d);
+  ctxAgain.app_setActiveDay("lunes");
+  ctxAgain.app_toggleCheck("lun-press-banca");
+  var again = saved(ctxAgain);
+  assert.strictEqual(again.exercises["lun-press-banca"].top, 60, "no se convierte dos veces");
+});
+
+test("reentrada tras 10+ días sin entrenar: aviso y bajada de pesos una sola vez", function () {
+  var old = { planVersion: 2, exercises: { "lun-press-banca": { top: 60, history: [{ date: "2026-10-05", weight: 60, reps: 8 }] } }, overrides: {}, removed: {}, custom: {}, schemes: {}, order: {}, schedule: {} };
+  var ctx = freshApp(old, "2026-10-21T12:00:00"); // 16 días después
+  assert.ok(ctx.__els.app.innerHTML.indexOf("Llevas 16 días") !== -1);
+  ctx.app_applyReentry();
+  assert.strictEqual(saved(ctx).exercises["lun-press-banca"].top, 55, "60 - 10 % = 54 -> múltiplo de 2.5 más cercano");
+  assert.ok(ctx.__els.app.innerHTML.indexOf("Llevas 16 días") === -1);
+  // en la descarga/parada no se avisa
+  var ctx2 = freshApp(old, "2026-12-24T12:00:00");
+  assert.ok(ctx2.__els.app.innerHTML.indexOf("sin registrar entrenos") === -1);
 });
 
 /* ---------- ejecución ---------- */

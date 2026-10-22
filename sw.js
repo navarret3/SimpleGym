@@ -1,6 +1,6 @@
 /* Service worker de SimpleGym: la app funciona sin conexión.
    Sube CACHE_VERSION en cada release para que los móviles recojan los cambios. */
-var CACHE_VERSION = "simplegym-v1.0.0";
+var CACHE_VERSION = "simplegym-v1.1.0";
 var ASSETS = [
   "./", "index.html", "styles.css", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png",
   "js/store.js", "js/core.js", "js/timer.js", "js/library.js", "js/builders.js", "js/data-nava.js", "js/profiles.js", "js/engine.js", "js/app.js",

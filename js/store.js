@@ -26,11 +26,12 @@ var SimpleGymStore = (function () {
   function writeLocalCache(userId, data) {
     try { localStorage.setItem(localKey(userId), JSON.stringify(data)); } catch (e) {}
   }
-  /* Clave antigua de la app de Nava (antes de unificar perfiles). Solo existe para él. */
+  /* Claves antiguas de las apps por separado (antes de unificar perfiles). Solo existen para Nava y Cristian. */
+  var LEGACY_KEYS = { nava: "planAnualProgresoV1", cristian: "gymAmigoProgresoV1" };
   function readLegacy(userId) {
-    if (userId !== "nava") return null;
+    if (!LEGACY_KEYS[userId]) return null;
     try {
-      var raw = localStorage.getItem("planAnualProgresoV1");
+      var raw = localStorage.getItem(LEGACY_KEYS[userId]);
       return raw ? JSON.parse(raw) : null;
     } catch (e) { return null; }
   }

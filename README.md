@@ -1,10 +1,10 @@
 # SimpleGym
 
-App de rutinas de gimnasio multi-persona (la rutina de fábrica es la de Nava, pero cualquiera puede crear la suya desde la propia app), sin build ni dependencias (HTML + CSS + JS plano), pensada para servirse tal cual desde GitHub Pages. Es instalable como app (PWA) y funciona sin conexión.
+App de rutinas de gimnasio multi-persona (las rutinas de fábrica son la de Nava y la de Cristian, pero cualquiera puede crear la suya desde la propia app), sin build ni dependencias (HTML + CSS + JS plano), pensada para servirse tal cual desde GitHub Pages. Es instalable como app (PWA) y funciona sin conexión.
 
 ## Cómo funciona hoy
 
-- Al abrir la app eliges quién eres (se recuerda en el dispositivo). También puedes ir directo con `index.html?u=nava`.
+- Al abrir la app eliges quién eres (se recuerda en el dispositivo). También puedes ir directo con `index.html?u=nava` o `index.html?u=cristian`.
 - Botón "+ Añadir rutina" en esa misma pantalla: crea una rutina nueva desde cero con solo poner un nombre. Empieza con 3 días vacíos (lunes/miércoles/viernes) y una fase única de progresión; se completa con "Editar rutina" → "+ Añadir ejercicio" en cada día, igual que con Nava. Se guarda junto al resto de datos, así que la nueva rutina aparece en cualquier dispositivo, no solo en el que la creaste.
 - Los pesos, el registro de cada sesión y las ediciones de rutina (nombre, series, reps, ejercicios añadidos/eliminados) se guardan **siempre en local** (`localStorage`), así que funciona sin conexión.
 - Si configuras Supabase (ver abajo), además esos mismos datos se sincronizan en la nube: entras desde el móvil o el portátil y ves el mismo progreso.
@@ -27,7 +27,7 @@ Gracias a esto, cualquier rutina tiene:
 
 Esto es un motor de reglas (periodización por bloques), no una IA generativa en vivo: no hay ninguna llamada a un servicio de IA desde el navegador (evita exponer una API key en código público).
 
-> Nota: el perfil de Cristian se ha retirado (sus datos en Supabase no se han tocado). Se pueden crear perfiles nuevos desde el selector.
+> Nota: el perfil de Cristian (PPL de 5 días, recomposición) vuelve a estar disponible tal como estaba, con sus datos de Supabase intactos. Sigue con su plan original en pirámide; no se ha migrado a doble progresión.
 
 ## Activar sincronización real (Supabase)
 
@@ -92,7 +92,7 @@ Al no haber login, cualquiera que tenga la `anon key` (visible en el código fue
 | `js/timer.js` | Temporizador de descanso |
 | `js/library.js` | Músculos, biblioteca de ejercicios y alternativas |
 | `js/builders.js` | Plantillas de rutina y creación de perfiles |
-| `js/data-nava.js`, `js/profiles.js` | Rutina de Nava (plan v2) y registro de perfiles |
+| `js/data-nava.js`, `js/data-cristian.js`, `js/profiles.js` | Rutinas de Nava (plan v2) y Cristian, y registro de perfiles |
 | `js/engine.js` | Motor genérico: progresión, edición, sesión del día, render |
 | `js/app.js` | Selector de perfil y arranque |
 | `tests/run.js` | Tests de la lógica (sin dependencias) |

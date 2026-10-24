@@ -8,7 +8,7 @@ var vm = require("vm");
 var assert = require("assert");
 
 var ROOT = path.join(__dirname, "..");
-var FILES = ["store", "core", "timer", "library", "builders", "data-nava", "profiles", "engine", "app"];
+var FILES = ["store", "core", "timer", "library", "builders", "data-nava", "data-cristian", "profiles", "engine", "app"];
 
 function makeContext(nowISO) {
   var storage = {};
@@ -364,6 +364,33 @@ test("reentrada tras 10+ días sin entrenar: aviso y bajada de pesos una sola ve
   // en la descarga/parada no se avisa
   var ctx2 = freshApp(old, "2026-12-24T12:00:00");
   assert.ok(ctx2.__els.app.innerHTML.indexOf("sin registrar entrenos") === -1);
+});
+
+
+/* ---------- perfil de Cristian ---------- */
+test("el perfil de Cristian está registrado y su rutina es válida", function () {
+  var ctx = freshApp();
+  var r = JSON.parse(vm.runInContext('(function(){ var ids = {}, bad = [];' +
+    ' CRISTIAN_CONFIG.days.forEach(function(d){ d.exercises.forEach(function(e){ if (ids[e.id]) bad.push("dup " + e.id); ids[e.id] = 1; if (!muscleColors[e.muscle]) bad.push("musculo " + e.muscle); }); });' +
+    ' return JSON.stringify({ bad: bad, reg: !!PROFILES.cristian, stat: !!STATIC_PROFILE_IDS.cristian, days: CRISTIAN_CONFIG.days.length }); })()', ctx));
+  assert.deepStrictEqual(r.bad, []);
+  assert.ok(r.reg && r.stat);
+  assert.strictEqual(r.days, 5);
+});
+
+test("Cristian recupera su progreso antiguo y puede registrar en cualquier ejercicio", function () {
+  var ctx = makeContext("2026-10-21T12:00:00");
+  load(ctx, FILES);
+  ctx.__initial = { exercises: { "a-lun-press-banca": { top: 60, history: [{ date: "2026-10-12", weight: 60, reps: 6 }] } }, overrides: {}, removed: {}, custom: {} };
+  var firstDay = vm.runInContext('CRISTIAN_CONFIG.days[0].id', ctx);
+  vm.runInContext('initProfileApp(PROFILES.cristian.config, __initial)', ctx);
+  ctx.app_setActiveDay(firstDay);
+  var ex = vm.runInContext('CRISTIAN_CONFIG.days[0].exercises[0].id', ctx);
+  ctx.app_toggleExpand(ex);
+  setLog(ctx, 20, 10);
+  ctx.app_saveLog(ex);
+  var d = JSON.parse(ctx.__storage["simplegym_cache_cristian"]);
+  assert.strictEqual(d.exercises[ex].history.length >= 1, true);
 });
 
 /* ---------- ejecución ---------- */

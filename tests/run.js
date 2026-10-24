@@ -393,6 +393,20 @@ test("Cristian recupera su progreso antiguo y puede registrar en cualquier ejerc
   assert.strictEqual(d.exercises[ex].history.length >= 1, true);
 });
 
+test("la pantalla de inicio es el selector aunque haya un perfil recordado", async function () {
+  var ctx = makeContext("2026-10-21T12:00:00");
+  load(ctx, FILES);
+  ctx.localStorage.setItem("simplegym_current_user", "nava");
+  await vm.runInContext("boot()", ctx);
+  var html = ctx.__els.app.innerHTML;
+  assert.ok(html.indexOf("¿Quién eres?") !== -1);
+  assert.ok(html.indexOf("Nava") !== -1 && html.indexOf("Cristian") !== -1);
+  assert.ok(html.indexOf("ÚLTIMO USADO") !== -1);
+  ctx.location.search = "?u=cristian";
+  await vm.runInContext("boot()", ctx);
+  assert.ok(ctx.__els.app.innerHTML.indexOf("¿Quién eres?") === -1, "con ?u= entra directo");
+});
+
 /* ---------- ejecución ---------- */
 (async function () {
   var failed = 0;

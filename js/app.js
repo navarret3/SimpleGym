@@ -49,6 +49,7 @@ function renderUserPicker() {
   Object.keys(PROFILES).forEach(function (id) {
     var u = PROFILES[id];
     html += '<div class="userpick-btn" style="background:' + u.color + '15;border:1px solid ' + u.color + '55" onclick="chooseUser(\'' + id + '\')">' +
+      (id === getStoredUser() ? '<div style="font-size:9px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.4);margin-bottom:6px">ÚLTIMO USADO</div>' : '') +
       '<div style="font-size:18px;font-weight:800;color:' + u.color + '">' + esc(u.label) + '</div>' +
       '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px">' + esc(u.sub) + '</div>' +
     '</div>';
@@ -70,7 +71,7 @@ function renderUserPicker() {
       "</div>" +
     "</div>";
   }
-  html += '<div class="userpick-note">Se recuerda en este dispositivo. Puedes cambiar de usuario luego desde el pie de la página.</div></div>';
+  html += '<div class="userpick-note">Elige tu perfil para entrar. Puedes volver aquí con "Cambiar de usuario" en el pie de la página.</div></div>';
   app.innerHTML = html;
   if (creatingProfile) {
     var inp = document.getElementById("new-profile-name");
@@ -114,7 +115,8 @@ window.app_createProfile = function () {
 
 async function boot(forceUser) {
   await loadCustomProfiles();
-  var user = forceUser || paramUser() || getStoredUser();
+  // La pantalla de inicio es el selector de perfil; solo se salta con ?u=perfil o al elegir uno.
+  var user = forceUser || paramUser();
   if (!user || !PROFILES[user]) { renderUserPicker(); return; }
   setStoredUser(user);
   document.getElementById("app").innerHTML = '<div class="loading">CARGANDO…</div>';

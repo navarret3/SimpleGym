@@ -64,6 +64,14 @@ Esto es un motor de reglas (periodización por bloques), no una IA generativa en
 
 Al no haber login, cualquiera que tenga la `anon key` (visible en el código fuente) puede leer o escribir la tabla `progress` de cualquier usuario. Es un acuerdo consciente por simplicidad (solo hay 2 usuarios y los datos son pesos de gimnasio, nada sensible). Si en el futuro se quiere proteger de verdad, el siguiente paso natural es añadir Supabase Auth (login real) y una política RLS que solo permita a cada usuario tocar su propia fila.
 
+## Estado actual (v1.4.0)
+
+- **Sin progresión automática:** los ejercicios, series, reps y pesos son siempre los de la rutina y solo cambian a mano desde "Editar rutina". Las fases de cada plan se conservan en los datos, pero no modifican nada ni se muestran. "Registrar lo que hiciste hoy" solo guarda el historial (gráfica y último registro). En el futuro se añadirá un plan avanzado de progresión.
+- **Interfaz sin textos explicativos:** sin notas de ejercicio, foco del día, regla de progresión, aviso de días sin entrenar ni aviso de día de descanso.
+- **Estadísticas por ejercicio:** botón junto a desplegar que abre una gráfica del peso en el tiempo (registros de cada sesión y, en discontinuo, los cambios de peso hechos en la rutina), con inicio, actual, máximo, cambio y los últimos registros.
+- **Añadir y quitar días de entreno** desde "Editar rutina": los días libres de la semana se pueden convertir en día de entreno, y cualquier día se puede quitar (siempre queda al menos uno).
+- **Modo edición:** nombre del ejercicio y grupo muscular a mano (sin sugerencias), nombre y tipo del día editables, series visibles sin desplegar, sin check de hecho y "+ Añadir ejercicio" arriba de la lista.
+
 ## Funciones de la v1.0.0
 
 - **Modo gimnasio**: al marcar un ejercicio como hecho o registrarlo arranca un temporizador de descanso (2 min en básicos de ≤ 8 reps, 75 s en el resto, 60 s en peso corporal) que sigue visible mientras navegas; −15 / +30 s / parar. Vibra al terminar.

@@ -64,14 +64,13 @@ function renderUserPicker() {
       '<select id="new-profile-template" class="userpick-input">' +
         Object.keys(TEMPLATES).map(function (k) { return '<option value="' + k + '"' + (k === "upperlower4" ? " selected" : "") + ">" + esc(TEMPLATES[k].label) + "</option>"; }).join("") +
       "</select>" +
-      '<div class="userpick-note" style="max-width:none;text-align:left">Plantillas con doble progresión (rango de reps), 5 semanas de progreso + 1 de descarga. Torso/Pierna 4 días es la opción recomendada para ganar músculo.</div>' +
       '<div class="userpick-form-actions">' +
         '<div class="userpick-form-btn" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5)" onclick="app_cancelCreateProfile()">Cancelar</div>' +
         '<div class="userpick-form-btn" style="background:#C8FF00;color:#000" onclick="app_createProfile()">Crear rutina</div>' +
       "</div>" +
     "</div>";
   }
-  html += '<div class="userpick-note">Elige tu perfil para entrar. Puedes volver aquí con "Cambiar de usuario" en el pie de la página.</div></div>';
+  html += '</div>';
   app.innerHTML = html;
   if (creatingProfile) {
     var inp = document.getElementById("new-profile-name");

@@ -37,6 +37,7 @@ function makeContext(nowISO) {
       removeItem: function (k) { delete storage[k]; },
     },
     location: { search: "" },
+    confirm: function () { return true; },
     document: {
       body: { style: {} },
       getElementById: function (id) {
@@ -159,31 +160,46 @@ test("se puede registrar en ejercicios de peso corporal y personalizados", funct
   setLog(ctx, 30, 16);
   ctx.app_saveLog(id);
   var e = saved(ctx).exercises[id];
-  // fase de progresión: 30 kg = base; 16 reps supera el objetivo (10) -> sube un escalón de 2.5
-  assert.strictEqual(e.top, 32.5);
+  assert.strictEqual(e.history[0].weight, 30);
+  assert.strictEqual(e.top, 0, "registrar no cambia los pesos de la rutina");
 });
 
-test("editar a mano no congela: el peso registrado sigue moviendo el peso base", function () {
+test("sin progresión: registrar guarda historial pero los pesos solo cambian a mano", function () {
   var ctx = freshApp();
   ctx.app_setActiveDay("lunes");
-  ctx.app_updateSetField("lun-jalon-pecho", 0, "weight", "20");
+  ctx.app_toggleExpand("lun-press-banca");
+  setLog(ctx, 70, 10);
+  ctx.app_saveLog("lun-press-banca");
   var d = saved(ctx);
-  assert.strictEqual(d.schemes["lun-jalon-pecho"].offsets[0], -37.5); // 20 kg frente a 57.5 de peso base
-  ctx.app_toggleExpand("lun-jalon-pecho");
-  setLog(ctx, 70, 4);
-  ctx.app_saveLog("lun-jalon-pecho");
-  d = saved(ctx);
-  // fase de progresión: peso mostrado = base; 4 reps < 12 objetivo -> no sube escalón
-  assert.strictEqual(d.exercises["lun-jalon-pecho"].top, 70);
+  assert.strictEqual(d.exercises["lun-press-banca"].top, 60);
+  assert.strictEqual(d.exercises["lun-press-banca"].history[0].weight, 70);
+  setLog(ctx, 72.5, 9);
+  ctx.app_saveLog("lun-press-banca");
+  assert.strictEqual(saved(ctx).exercises["lun-press-banca"].history.length, 1, "el mismo día se sobrescribe");
+  ctx.app_updateSetField("lun-press-banca", 2, "weight", "62.5");
+  assert.strictEqual(saved(ctx).exercises["lun-press-banca"].top, 62.5, "editar a mano sí cambia el peso");
 });
 
-test("la descarga no modifica el peso base", function () {
-  var ctx = freshApp(null, "2026-12-01T12:00:00"); // semana de descarga
+test("las fases ya no modifican series, reps ni pesos", function () {
+  var desc = freshApp(null, "2026-12-01T12:00:00"); // antes semana de descarga
+  desc.app_setActiveDay("lunes");
+  desc.app_toggleExpand("lun-press-banca");
+  var html = desc.__els.app.innerHTML;
+  assert.ok(html.indexOf("3 series · 6–10 reps") !== -1);
+  assert.ok(html.indexOf("60 kg") !== -1);
+  assert.ok(html.indexOf("MODO") === -1 && html.indexOf("REGLA DE PROGRESIÓN") === -1);
+});
+
+test("sin textos explicativos: cabecera, descanso, foco ni notas", function () {
+  var ctx = freshApp(null, "2026-10-21T12:00:00"); // miércoles: día de descanso
   ctx.app_setActiveDay("lunes");
   ctx.app_toggleExpand("lun-press-banca");
-  setLog(ctx, 50, 10);
-  ctx.app_saveLog("lun-press-banca");
-  assert.strictEqual(saved(ctx).exercises["lun-press-banca"].top, 60);
+  var html = ctx.__els.app.innerHTML;
+  assert.ok(html.indexOf("Hoy es día de descanso") === -1);
+  assert.ok(html.indexOf("ESPECIALIZACIÓN TREN SUPERIOR") === -1);
+  assert.ok(html.indexOf("Escápulas atrás") === -1, "sin nota del ejercicio");
+  assert.ok(html.indexOf("Técnica antes que ego") === -1, "sin foco del día");
+  assert.ok(html.indexOf("la evidencia apunta") === -1);
 });
 
 test("los checks del día persisten y caducan al cambiar de fecha", function () {
@@ -210,56 +226,47 @@ test("reordenar ejercicios guarda el orden por día", function () {
   assert.strictEqual(saved(ctx).order.lunes[0], "lun-press-banca");
 });
 
-/* ---------- motor: doble progresión ---------- */
-function templateProfile(ctx) {
-  vm.runInContext('PROFILES.t = { label: "T", sub: "t", color: "#C8FF00", config: buildConfig("t", "T", "#C8FF00", "upperlower4") };', ctx);
-}
-function freshTemplateApp(initial, nowISO) {
-  var ctx = makeContext(nowISO || "2026-10-21T12:00:00");
-  load(ctx, FILES);
-  templateProfile(ctx);
-  ctx.__initial = initial || null;
-  vm.runInContext('initProfileApp(PROFILES.t.config, __initial)', ctx);
-  return ctx;
-}
-
-test("doble progresión: llegar al máximo del rango sube el peso base", function () {
-  var ctx = freshTemplateApp();
-  var day = vm.runInContext('PROFILES.t.config.days[0].id', ctx);
-  var key = day + "-e0"; // press banca 6-10, salto 2.5
-  ctx.app_setActiveDay(day);
-  ctx.app_toggleExpand(key);
-  setLog(ctx, 60, 10);
-  ctx.app_saveLog(key, true);
-  assert.strictEqual(saved(ctx, "t").exercises[key].top, 62.5);
-  setLog(ctx, 62.5, 8);
-  ctx.app_saveLog(key);
-  var d = saved(ctx, "t");
-  assert.strictEqual(d.exercises[key].top, 62.5, "sin llegar al máximo repite el peso");
-  assert.strictEqual(d.exercises[key].history.length, 1, "el mismo día se sobrescribe");
+/* ---------- modo edición ---------- */
+test("modo edición: sin check, desplegado, añadir arriba y sin sustituir", function () {
+  var ctx = freshApp();
+  ctx.app_setActiveDay("lunes");
+  ctx.app_toggleEditMode();
+  var html = ctx.__els.app.innerHTML;
+  assert.ok(html.indexOf('class="chk"') === -1, "sin check de hecho");
+  assert.ok(html.indexOf("pyrow-edit") !== -1, "series visibles sin desplegar");
+  assert.ok(html.indexOf("Añadir ejercicio") < html.indexOf('class="excard"'), "añadir ejercicio va arriba");
+  assert.ok(html.indexOf("Sustituir por") === -1);
+  assert.ok(html.indexOf("datalist") === -1 && html.indexOf('list="') === -1, "nombre editable sin desplegable");
+  ctx.app_toggleEditMode();
+  assert.ok(ctx.__els.app.innerHTML.indexOf('class="chk"') !== -1, "fuera de edición vuelve el check");
 });
 
-test("aviso de estancamiento y bajada del 10 %", function () {
-  var ctx0 = freshTemplateApp();
-  var day = vm.runInContext('PROFILES.t.config.days[0].id', ctx0);
-  var key = day + "-e0";
-  var init = { exercises: {}, overrides: {}, removed: {}, custom: {}, schemes: {}, order: {} };
-  init.exercises[key] = { top: 60, history: [{ date: "2026-10-14", weight: 60, reps: 7, hit: false }] };
-  var ctx = freshTemplateApp(init);
-  ctx.app_setActiveDay(day);
-  ctx.app_toggleExpand(key);
-  setLog(ctx, 60, 7);
-  ctx.app_saveLog(key);
-  ctx.app_toggleExpand(key);
-  assert.ok(ctx.__els.app.innerHTML.indexOf("estancado") !== -1);
-  ctx.app_applyDeload(key);
-  var e = saved(ctx, "t").exercises[key];
-  assert.strictEqual(e.top, 54);
-  assert.ok(e.deloadAt);
-  assert.ok(ctx.__els.app.innerHTML.indexOf("estancado") === -1);
+test("modo edición: cambiar el nombre a mano no toca el músculo", function () {
+  var ctx = freshApp();
+  ctx.app_setActiveDay("lunes");
+  ctx.app_updateExerciseName("lun-press-banca", "Curl Barra EZ");
+  var ov = saved(ctx).overrides["lun-press-banca"];
+  assert.strictEqual(ov.name, "Curl Barra EZ");
+  assert.strictEqual(ov.muscle, "Pecho");
 });
 
-test("escribir un rango en el modo edición convierte el ejercicio a doble progresión", function () {
+test("modo edición: renombrar el día persiste y se ve en la visión semanal", function () {
+  var ctx = freshApp();
+  ctx.app_setActiveDay("lunes");
+  ctx.app_updateDayName("lunes", "fullName", "Empuje pesado");
+  ctx.app_updateDayName("lunes", "type", "PUSH");
+  var d = saved(ctx);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(d.dayNames.lunes)), { fullName: "Empuje pesado", type: "PUSH" });
+  var ctx2 = freshApp(d);
+  ctx2.app_setActiveDay("lunes");
+  var html = ctx2.__els.app.innerHTML;
+  assert.ok(html.indexOf("Empuje pesado") !== -1 && html.indexOf("PUSH") !== -1);
+  ctx2.app_updateDayName("lunes", "fullName", "");
+  ctx2.app_updateDayName("lunes", "type", "");
+  assert.ok(!saved(ctx2).dayNames.lunes, "vacío vuelve al nombre original");
+});
+
+test("escribir un rango en el modo edición lo aplica a todas las series", function () {
   var ctx = freshApp();
   ctx.app_setActiveDay("lunes");
   ctx.app_updateSetField("lun-press-banca", 0, "reps", "6-10");
@@ -289,15 +296,10 @@ test("el calendario movido sobrevive a recargar y decide el día de hoy", functi
   assert.ok(ctx2.__els.app.innerHTML.indexOf("Hoy es día de descanso") === -1, "hoy (miércoles) ya es día de entreno");
 });
 
-test("series semanales por músculo y alternativas en el modo edición", function () {
+test("panel de series semanales por músculo", function () {
   var ctx = freshApp();
   ctx.app_setActiveDay("lunes");
   assert.ok(ctx.__els.app.innerHTML.indexOf("SERIES SEMANALES POR MÚSCULO") !== -1);
-  ctx.app_toggleEditMode();
-  ctx.app_toggleExpand("lun-press-banca");
-  var html = ctx.__els.app.innerHTML;
-  assert.ok(html.indexOf("Sustituir por") !== -1);
-  assert.ok(html.indexOf("Press Inclinado Mancuerna · Mancuernas") !== -1, "ofrece alternativas del mismo músculo con su material");
 });
 
 
@@ -354,16 +356,10 @@ test("cambio de plan: convierte tus pesos antiguos una sola vez y no toca ejerci
   assert.strictEqual(again.exercises["lun-press-banca"].top, 60, "no se convierte dos veces");
 });
 
-test("reentrada tras 10+ días sin entrenar: aviso y bajada de pesos una sola vez", function () {
+test("no hay aviso de días sin entrenar", function () {
   var old = { planVersion: 2, exercises: { "lun-press-banca": { top: 60, history: [{ date: "2026-10-05", weight: 60, reps: 8 }] } }, overrides: {}, removed: {}, custom: {}, schemes: {}, order: {}, schedule: {} };
   var ctx = freshApp(old, "2026-10-21T12:00:00"); // 16 días después
-  assert.ok(ctx.__els.app.innerHTML.indexOf("Llevas 16 días") !== -1);
-  ctx.app_applyReentry();
-  assert.strictEqual(saved(ctx).exercises["lun-press-banca"].top, 55, "60 - 10 % = 54 -> múltiplo de 2.5 más cercano");
-  assert.ok(ctx.__els.app.innerHTML.indexOf("Llevas 16 días") === -1);
-  // en la descarga/parada no se avisa
-  var ctx2 = freshApp(old, "2026-12-24T12:00:00");
-  assert.ok(ctx2.__els.app.innerHTML.indexOf("sin registrar entrenos") === -1);
+  assert.ok(ctx.__els.app.innerHTML.indexOf("sin registrar entrenos") === -1);
 });
 
 
@@ -405,6 +401,98 @@ test("la pantalla de inicio es el selector aunque haya un perfil recordado", asy
   ctx.location.search = "?u=cristian";
   await vm.runInContext("boot()", ctx);
   assert.ok(ctx.__els.app.innerHTML.indexOf("¿Quién eres?") === -1, "con ?u= entra directo");
+});
+
+/* ---------- añadir y quitar días de entreno ---------- */
+test("añadir un día de entreno en un día libre, con ejercicios, y que persista", function () {
+  var ctx = freshApp(); // 21 oct 2026: miércoles, día libre en el plan de Nava
+  ctx.app_toggleEditMode();
+  assert.ok(ctx.__els.app.innerHTML.indexOf("app_addDay(3)") !== -1, "el miércoles libre se puede añadir");
+  ctx.app_addDay(3);
+  var d = saved(ctx);
+  assert.strictEqual(d.customDays.length, 1);
+  var id = d.customDays[0].id;
+  assert.strictEqual(d.customDays[0].weekday, 3);
+  ctx.app_addExercise(id);
+  var d2 = saved(ctx);
+  assert.strictEqual(d2.custom[id].length, 1);
+  var ctx2 = freshApp(d2); // al recargar, hoy (miércoles) es ese día
+  var html = ctx2.__els.app.innerHTML;
+  assert.ok(html.indexOf("MIÉRCOLES") !== -1 && html.indexOf("Nuevo ejercicio") !== -1);
+  assert.ok(html.indexOf("Miércoles") !== -1 && html.indexOf("ENTRENO") !== -1, "aparece en la visión semanal");
+  ctx.app_addDay(1); // lunes ya ocupado: no hace nada
+  assert.strictEqual(saved(ctx).customDays.length, 1);
+});
+
+test("quitar días de entreno: del perfil y añadidos, nunca el último", function () {
+  var ctx = freshApp();
+  ctx.app_setActiveDay("viernes");
+  ctx.app_removeDay("viernes");
+  var d = saved(ctx);
+  assert.strictEqual(d.removedDays.viernes, true);
+  ctx.app_toggleEditMode();
+  assert.ok(ctx.__els.app.innerHTML.indexOf("app_addDay(5)") !== -1, "el viernes queda libre para añadir otro");
+  ctx.app_addDay(5);
+  var id = saved(ctx).customDays[0].id;
+  ctx.app_addExercise(id);
+  ctx.app_removeDay(id);
+  d = saved(ctx);
+  assert.strictEqual(d.customDays.length, 0);
+  assert.ok(!d.custom[id], "sus ejercicios se borran con el día");
+  ["lunes", "martes", "jueves"].forEach(function (k) { ctx.app_removeDay(k); });
+  d = saved(ctx);
+  assert.ok(!d.removedDays.jueves, "el último día no se puede quitar");
+  assert.ok(ctx.__els.app.innerHTML.indexOf("JUEVES") !== -1 || ctx.__els.app.innerHTML.indexOf("TORSO B") !== -1);
+});
+
+/* ---------- estadísticas ---------- */
+test("estadísticas: botón junto a desplegar, gráfica y resumen del historial", function () {
+  var init = { planVersion: 2, exercises: { "lun-press-banca": { top: 60, history: [
+    { date: "2026-09-01", weight: 55, reps: 8 }, { date: "2026-09-20", weight: 57.5, reps: 8 }, { date: "2026-10-12", weight: 60, reps: 9 }] } },
+    overrides: {}, removed: {}, custom: {}, schemes: {}, order: {}, schedule: {} };
+  var ctx = freshApp(init);
+  ctx.app_setActiveDay("lunes");
+  var html = ctx.__els.app.innerHTML;
+  assert.ok(html.indexOf("app_openStats('lun-press-banca')") !== -1);
+  assert.ok(html.indexOf('class="statbtn"') < html.indexOf('class="expbtn"'), "va justo antes del botón de desplegar");
+  ctx.app_openStats("lun-press-banca");
+  html = ctx.__els.app.innerHTML;
+  assert.ok(html.indexOf("statsmodal") !== -1 && html.indexOf("<polyline") !== -1);
+  assert.ok(html.indexOf("55 kg") !== -1 && html.indexOf("+5 kg · +9 %") !== -1, "inicio y cambio");
+  ctx.app_closeStats();
+  assert.ok(ctx.__els.app.innerHTML.indexOf("statsmodal") === -1);
+  ctx.app_toggleEditMode();
+  assert.ok(ctx.__els.app.innerHTML.indexOf("app_openStats") === -1, "no aparece en modo edición");
+});
+
+test("estadísticas: los cambios de peso de la rutina quedan en el historial y sin datos hay aviso", function () {
+  var ctx = freshApp();
+  ctx.app_setActiveDay("lunes");
+  ctx.app_openStats("lun-curl-ez");
+  assert.ok(ctx.__els.app.innerHTML.indexOf("Aún no hay registros") !== -1);
+  ctx.app_closeStats();
+  ctx.app_updateSetField("lun-curl-ez", 2, "weight", "35");
+  var e = saved(ctx).exercises["lun-curl-ez"];
+  assert.strictEqual(e.planLog.length, 1);
+  assert.strictEqual(e.planLog[0].weight, 35);
+  ctx.app_toggleExpand("lun-curl-ez");
+  setLog(ctx, 35, 10);
+  ctx.app_saveLog("lun-curl-ez");
+  assert.strictEqual(saved(ctx).exercises["lun-curl-ez"].planLog.length, 1, "registrar no borra el historial de la rutina");
+});
+
+/* ---------- versiones de los archivos ---------- */
+test("index.html y sw.js usan la misma versión en todos los archivos", function () {
+  var html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
+  var sw = fs.readFileSync(path.join(ROOT, "sw.js"), "utf8");
+  var v = /var APP_VERSION = "([^"]+)"/.exec(sw)[1];
+  var refs = html.match(/(src|href)="(js\/[^"]+|styles\.css[^"]*)"/g) || [];
+  assert.ok(refs.length >= FILES.length + 1);
+  refs.forEach(function (r) { assert.ok(r.indexOf("?v=" + v + '"') !== -1, r + " debe llevar ?v=" + v); });
+  FILES.forEach(function (f) {
+    assert.ok(html.indexOf('js/' + f + '.js?v=' + v) !== -1, f + " en index.html");
+    assert.ok(sw.indexOf('"js/' + f + '.js"') !== -1, f + " en la caché del service worker");
+  });
 });
 
 /* ---------- ejecución ---------- */

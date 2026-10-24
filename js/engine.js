@@ -4,10 +4,8 @@
    ============================================================ */
 function initProfileApp(profile, initialData) {
   var days = profile.days;
-  var phases = profile.phases;
   var header = profile.header;
   var weightColumnLabel = profile.weightColumnLabel || "PESO";
-  var currentProfile = getPhaseProfile(getPhase(phases, todayISO()).tag);
 
   function round025(n) { return Math.round(n * 4) / 4; }
   function fmtWeight(w, bw) { return w > 0 ? round(w) + " kg" : (bw ? "Corporal" : "Elige peso"); }
@@ -20,7 +18,7 @@ function initProfileApp(profile, initialData) {
         if (ex.trackable) exercises[ex.id] = { top: ex.baseTop, history: [] };
       });
     });
-    return { exercises: exercises, overrides: {}, removed: {}, custom: {}, schemes: {}, order: {}, schedule: {}, session: { date: todayISO(), checked: {} } };
+    return { exercises: exercises, overrides: {}, removed: {}, custom: {}, schemes: {}, order: {}, schedule: {}, dayNames: {}, customDays: [], removedDays: {}, session: { date: todayISO(), checked: {} } };
   }
 
   /* Versiones anteriores congelaban la pirámide como texto al editar un
@@ -54,9 +52,11 @@ function initProfileApp(profile, initialData) {
       schemes: parsed.schemes || {},
       order: parsed.order || {},
       schedule: parsed.schedule || {},
+      dayNames: parsed.dayNames || {},
+      customDays: (parsed.customDays || []).map(function (d) { return Object.assign({ exercises: [] }, d); }),
+      removedDays: parsed.removedDays || {},
       session: parsed.session && parsed.session.date === today ? parsed.session : def.session,
       planVersion: parsed.planVersion || 1,
-      reentryAt: parsed.reentryAt || "",
     };
     migrateFrozenOverrides(p);
     upgradePlan(p, parsed);
@@ -120,49 +120,19 @@ function initProfileApp(profile, initialData) {
     return e ? e.top : (scheme.baseTop || 0);
   }
 
-  /* En ejercicios con rango de reps (repMax) las fases no cambian las reps
-     y el bloque de hipertrofia no baja el peso: ya trabajan en rango de músculo. */
-  function weightMultFor(scheme) {
-    return scheme.repMax && currentProfile.key === "hipertrofia" ? 1 : currentProfile.weightMult;
-  }
-
+  /* Series tal cual están en la rutina: sin fases ni progresión automática,
+     los pesos y reps solo cambian a mano desde "Editar rutina". */
   function getPyramid(key, prog) {
     var scheme = getScheme(key, prog);
     if (!scheme) return findExercise(key).staticPyramid;
     var top = topFor(key, prog, scheme);
-    var wm = weightMultFor(scheme);
-    var ranged = !!scheme.repMax;
-    var rows = scheme.repsPattern.map(function (reps, i) {
+    return scheme.repsPattern.map(function (reps, i) {
       return {
-        reps: ranged ? reps : Math.max(1, Math.round(reps * currentProfile.repsMult)),
-        weight: Math.max(0, round025((top + scheme.offsets[i]) * wm)),
+        set: i + 1,
+        reps: scheme.repMax ? reps + "–" + scheme.repMax : reps,
+        weight: fmtWeight(Math.max(0, round025(top + scheme.offsets[i])), scheme.bw),
       };
     });
-    if (currentProfile.setsDelta > 0) {
-      if (ranged) {
-        rows.push({ reps: rows[rows.length - 1].reps, weight: rows[rows.length - 1].weight });
-      } else {
-        var first = rows[0];
-        rows.unshift({ reps: Math.round(first.reps * 1.3), weight: round(first.weight * 0.85) });
-      }
-    } else if (currentProfile.setsDelta < 0 && rows.length > 2) {
-      rows.shift();
-    }
-    return rows.map(function (r, i) {
-      return { set: i + 1, reps: ranged ? r.reps + "–" + scheme.repMax : r.reps, weight: fmtWeight(r.weight, scheme.bw) };
-    });
-  }
-
-  /* Estancamiento: 2 registros seguidos sin llegar al objetivo con el mismo
-     peso (o menos). La semana de descarga no cuenta. */
-  function stallInfo(key) {
-    var e = progress.exercises[key];
-    if (!e || !e.history) return null;
-    var h = e.history.filter(function (x) { return !e.deloadAt || x.date > e.deloadAt; });
-    if (h.length < 2) return null;
-    var a = h[h.length - 1], b = h[h.length - 2];
-    if (a.hit === false && b.hit === false && a.weight > 0 && a.weight <= b.weight) return { weight: a.weight };
-    return null;
   }
 
   /* ---------------- STATE ---------------- */
@@ -173,20 +143,69 @@ function initProfileApp(profile, initialData) {
   var editingId = null;
   var toastMsg = "";
   var toastTimeout = null;
-  var planOpen = false;
   var confirmReset = false;
   var confirmResetTimeout = null;
   var editMode = false;
+  var statsKey = null;
 
-  /* Día de la semana de cada día de entreno: el del perfil, salvo que se haya
-     movido desde "Editar rutina" (progress.schedule). */
+  /* Días de entreno activos: los del perfil que no se hayan quitado, más los
+     añadidos desde "Editar rutina" (progress.customDays). */
+  function activeDays() {
+    return days.filter(function (d) { return !progress.removedDays[d.id]; }).concat(progress.customDays);
+  }
+  function findDay(id) { return activeDays().filter(function (d) { return d.id === id; })[0] || null; }
+
+  /* Día de la semana de cada día de entreno: el del perfil (o el elegido al
+     añadirlo), salvo que se haya movido desde "Editar rutina" (progress.schedule). */
   function dayMap() {
     var wdOf = {};
-    Object.keys(profile.dayIdsByWeekday).forEach(function (wd) { wdOf[profile.dayIdsByWeekday[wd]] = parseInt(wd, 10); });
-    Object.keys((progress && progress.schedule) || {}).forEach(function (id) { if (wdOf[id] !== undefined) wdOf[id] = progress.schedule[id]; });
+    Object.keys(profile.dayIdsByWeekday).forEach(function (wd) {
+      var id = profile.dayIdsByWeekday[wd];
+      if (!progress.removedDays[id]) wdOf[id] = parseInt(wd, 10);
+    });
+    progress.customDays.forEach(function (d) { wdOf[d.id] = d.weekday; });
+    Object.keys(progress.schedule).forEach(function (id) { if (wdOf[id] !== undefined) wdOf[id] = progress.schedule[id]; });
     var map = {};
     Object.keys(wdOf).forEach(function (id) { map[wdOf[id]] = id; });
     return map;
+  }
+
+  var NEW_DAY_ACCENTS = ["#C8FF00", "#38BDF8", "#FF6B35", "#E879F9", "#FBBF24", "#34D399", "#A78BFA"];
+
+  function app_addDay(wd) {
+    wd = parseInt(wd, 10);
+    if (dayMap()[wd]) return;
+    var id = "dia-" + Date.now();
+    progress.customDays.push({
+      id: id, weekday: wd, label: WEEKDAY_SHORT[wd].toUpperCase(), fullName: WEEKDAY_NAMES[wd].toUpperCase(),
+      type: "ENTRENO", tag: "Extra", subtitle: "", accent: NEW_DAY_ACCENTS[wd % NEW_DAY_ACCENTS.length], bg: "#0a0a0a", exercises: [],
+    });
+    saveProgress(progress);
+    activeDay = id;
+    expanded = {};
+    render();
+  }
+
+  function app_removeDay(dayId) {
+    if (activeDays().length <= 1) { showToast("Debe quedar al menos 1 día de entreno."); return; }
+    var day = findDay(dayId);
+    if (!day || !window.confirm("¿Quitar " + dayLabel(day).fullName + " de tus días de entreno?")) return;
+    var isCustom = progress.customDays.some(function (d) { return d.id === dayId; });
+    if (isCustom) {
+      progress.customDays = progress.customDays.filter(function (d) { return d.id !== dayId; });
+      (progress.custom[dayId] || []).forEach(function (k) { delete progress.overrides[k]; delete progress.schemes[k]; });
+      delete progress.custom[dayId];
+    } else {
+      progress.removedDays[dayId] = true;
+    }
+    delete progress.schedule[dayId];
+    delete progress.order[dayId];
+    delete progress.dayNames[dayId];
+    saveProgress(progress);
+    var map = dayMap();
+    activeDay = trainingDayForToday(map) || nextTrainingDay(map, new Date().getDay());
+    expanded = {};
+    render();
   }
 
   function buildWeekDays() {
@@ -196,12 +215,29 @@ function initProfileApp(profile, initialData) {
     });
   }
 
+  /* Nombre y tipo del día, con lo que se haya cambiado en "Editar rutina". */
+  function dayLabel(day) {
+    var n = progress.dayNames[day.id] || {};
+    return { fullName: n.fullName || day.fullName, type: n.type || day.type };
+  }
+
+  function app_updateDayName(dayId, field, value) {
+    var v = String(value || "").trim();
+    var n = progress.dayNames[dayId] || (progress.dayNames[dayId] = {});
+    if (v) n[field] = v; else delete n[field];
+    if (!Object.keys(n).length) delete progress.dayNames[dayId];
+    saveProgress(progress);
+    render();
+  }
+
   function currentOverviewRows() {
-    if (!Object.keys(progress.schedule || {}).length) return profile.overviewRows;
+    var untouched = !Object.keys(progress.schedule).length && !Object.keys(progress.dayNames).length &&
+      !Object.keys(progress.removedDays).length && !progress.customDays.length;
+    if (untouched) return profile.overviewRows;
     var map = dayMap();
     return [1, 2, 3, 4, 5, 6, 0].map(function (wd) {
-      var d = map[wd] && days.filter(function (x) { return x.id === map[wd]; })[0];
-      return d ? { day: WEEKDAY_NAMES[wd], type: d.type, tag: d.tag, accent: d.accent }
+      var d = map[wd] && findDay(map[wd]);
+      return d ? { day: WEEKDAY_NAMES[wd], type: dayLabel(d).type, tag: d.tag, accent: d.accent }
                : { day: WEEKDAY_NAMES[wd], type: "Descanso", tag: wd === 0 ? "Recuperación" : "Cardio opcional", accent: "#222" };
     });
   }
@@ -222,7 +258,7 @@ function initProfileApp(profile, initialData) {
   /* Series por semana de cada músculo (con los esquemas base, sin ajustes de fase). */
   function weeklySets() {
     var totals = {};
-    days.forEach(function (day) {
+    activeDays().forEach(function (day) {
       effectiveExercises(day, progress).forEach(function (item) {
         var data = getDisplayData(item, progress);
         var scheme = getScheme(item.key, progress);
@@ -239,13 +275,13 @@ function initProfileApp(profile, initialData) {
     var map = dayMap();
     var html = '<select class="muscle-select" onchange="app_setDayWeekday(\'' + day.id + '\', this.value)">';
     [1, 2, 3, 4, 5, 6, 0].forEach(function (wd) {
-      var occ = map[wd] && map[wd] !== day.id ? days.filter(function (d) { return d.id === map[wd]; })[0] : null;
-      html += '<option value="' + wd + '"' + (map[wd] === day.id ? " selected" : "") + ">" + WEEKDAY_NAMES[wd] + (occ ? " ⇄ " + esc(occ.type) : "") + "</option>";
+      var occ = map[wd] && map[wd] !== day.id ? findDay(map[wd]) : null;
+      html += '<option value="' + wd + '"' + (map[wd] === day.id ? " selected" : "") + ">" + WEEKDAY_NAMES[wd] + (occ ? " ⇄ " + esc(dayLabel(occ).type) : "") + "</option>";
     });
     return html + "</select>";
   }
 
-  function currentDay() { return days.filter(function (d) { return d.id === activeDay; })[0] || days[0]; }
+  function currentDay() { return findDay(activeDay) || activeDays()[0]; }
 
   /* Los checks del día viven en progress.session (se guardan en local y en
      la nube) y caducan solos al cambiar de fecha. */
@@ -291,7 +327,6 @@ function initProfileApp(profile, initialData) {
     return {
       name: ov && ov.name != null ? ov.name : ex.name,
       muscle: (ov && ov.muscle) || (ex && ex.muscle) || "Core",
-      note: ex ? ex.note : "Ejercicio añadido por ti.",
       pyramid: pyramid,
       progressive: !!scheme,
       ranged: !!(scheme && scheme.repMax),
@@ -299,8 +334,8 @@ function initProfileApp(profile, initialData) {
     };
   }
 
-  /* Filas del modo edición: para ejercicios con peso se editan los valores
-     base (las fases los ajustan solas); para los de texto fijo, el texto. */
+  /* Filas del modo edición: para ejercicios con peso, reps y kg de cada
+     serie; para los de texto fijo, el texto. */
   function getEditRows(item, data) {
     var scheme = getScheme(item.key, progress);
     if (!scheme || (progress.overrides[item.key] && progress.overrides[item.key].sets)) return data.pyramid;
@@ -350,10 +385,7 @@ function initProfileApp(profile, initialData) {
   function app_toggleEditMode() { editMode = !editMode; render(); }
 
   function app_updateExerciseName(key, value) {
-    var ov = ensureOverride(key);
-    ov.name = value;
-    var match = findLibraryExercise(value);
-    if (match) ov.muscle = match.muscle;
+    ensureOverride(key).name = value;
     saveProgress(progress);
     render();
   }
@@ -393,9 +425,19 @@ function initProfileApp(profile, initialData) {
       } else {
         scheme.offsets[idx] = round(w - entry.top);
       }
+      recordPlanWeight(key, scheme, entry);
     }
     saveProgress(progress);
     render();
+  }
+
+  /* Historial del peso de la rutina (la serie más pesada), para ver en las
+     estadísticas cómo has ido subiendo aunque no registres cada sesión. */
+  function recordPlanWeight(key, scheme, entry) {
+    var maxW = Math.max.apply(null, scheme.offsets.map(function (o) { return round(entry.top + o); }));
+    var today = todayISO();
+    entry.planLog = (entry.planLog || []).filter(function (h) { return h.date !== today; })
+      .concat([{ date: today, weight: maxW }]).slice(-60);
   }
 
   function app_addSet(key) {
@@ -483,9 +525,85 @@ function initProfileApp(profile, initialData) {
     render();
   }
   function app_toggleExpand(i) { var k = activeDay + "-" + i; expanded[k] = !expanded[k]; render(); }
-  function app_togglePlan() { planOpen = !planOpen; render(); }
   function app_openLogger(exId) { editingId = exId; render(); }
   function app_cancelLogger() { editingId = null; render(); }
+  function app_openStats(key) { statsKey = key; render(); }
+  function app_closeStats() { statsKey = null; render(); }
+
+  /* Gráfica de líneas con ejes para la ventana de estadísticas. Cada serie es
+     { pts: [{ date, v }], color, dashed }; el eje X es el tiempo real. */
+  function statsChart(series, unit) {
+    var all = [];
+    series.forEach(function (s) { s.pts.forEach(function (p) { all.push(p); }); });
+    if (!all.length) return "";
+    var tOf = function (d) { return new Date(d + "T00:00:00").getTime(); };
+    var ts = all.map(function (p) { return tOf(p.date); });
+    var t0 = Math.min.apply(null, ts), t1 = Math.max.apply(null, ts);
+    var vs = all.map(function (p) { return p.v; });
+    var vmin = Math.min.apply(null, vs), vmax = Math.max.apply(null, vs);
+    var pad = (vmax - vmin) * 0.15 || Math.max(1, vmax * 0.1);
+    vmin = Math.max(0, vmin - pad); vmax = vmax + pad;
+    var W = 320, H = 180, L = 38, R = 12, T = 12, B = 26;
+    var x = function (t) { return t1 === t0 ? L + (W - L - R) / 2 : L + ((t - t0) / (t1 - t0)) * (W - L - R); };
+    var y = function (v) { return T + ((vmax - v) / (vmax - vmin)) * (H - T - B); };
+    var svg = '<svg viewBox="0 0 ' + W + " " + H + '" class="stats-svg">';
+    [0, 0.5, 1].forEach(function (f) {
+      var v = vmin + (vmax - vmin) * f, yy = y(v).toFixed(1);
+      svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '" stroke="rgba(255,255,255,0.08)"/>' +
+        '<text x="' + (L - 6) + '" y="' + yy + '" text-anchor="end" dominant-baseline="middle" class="stats-axis">' + Math.round(v) + "</text>";
+    });
+    svg += '<text x="' + L + '" y="' + (H - 6) + '" class="stats-axis">' + formatDateEs(all.reduce(function (a, p) { return tOf(p.date) === t0 ? p.date : a; }, "")) + "</text>";
+    if (t1 !== t0) svg += '<text x="' + (W - R) + '" y="' + (H - 6) + '" text-anchor="end" class="stats-axis">' + formatDateEs(all.reduce(function (a, p) { return tOf(p.date) === t1 ? p.date : a; }, "")) + "</text>";
+    series.forEach(function (s) {
+      if (!s.pts.length) return;
+      var pts = s.pts.slice().sort(function (a, b) { return tOf(a.date) - tOf(b.date); });
+      var line = pts.map(function (p) { return x(tOf(p.date)).toFixed(1) + "," + y(p.v).toFixed(1); }).join(" ");
+      svg += '<polyline fill="none" stroke="' + s.color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' + (s.dashed ? ' stroke-dasharray="5 4"' : "") + ' points="' + line + '"/>';
+      if (!s.dashed) pts.forEach(function (p) { svg += '<circle cx="' + x(tOf(p.date)).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="3" fill="' + s.color + '"/>'; });
+    });
+    return svg + '<text x="' + (L - 6) + '" y="' + (H - 6) + '" text-anchor="end" class="stats-axis">' + unit + "</text></svg>";
+  }
+
+  function statsHtml(key, accent) {
+    var data = getDisplayData({ key: key, base: findExercise(key) }, progress);
+    var e = progress.exercises[key] || {};
+    var logs = (e.history || []).slice();
+    var plan = (e.planLog || []).slice();
+    var useWeight = logs.some(function (h) { return h.weight > 0; }) || (!logs.length && plan.length);
+    var unit = useWeight ? "kg" : "reps";
+    var logPts = logs.map(function (h) { return { date: h.date, v: useWeight ? h.weight : h.reps }; });
+    var planPts = useWeight ? plan.map(function (h) { return { date: h.date, v: h.weight }; }) : [];
+    var html = '<div class="statsmodal" onclick="if (event.target === this) app_closeStats()"><div class="statscard">' +
+      '<div class="statshead"><div><div class="stats-eyebrow">ESTADÍSTICAS</div><div class="stats-title">' + esc(data.name) + "</div></div>" +
+      '<div class="stats-close" onclick="app_closeStats()">✕</div></div>';
+    if (!logPts.length && !planPts.length) {
+      return html + '<div class="stats-empty">Aún no hay registros de este ejercicio.</div></div></div>';
+    }
+    var src = logPts.length ? logPts : planPts;
+    var first = src[0].v, last = src[src.length - 1].v;
+    var best = Math.max.apply(null, src.map(function (p) { return p.v; }));
+    var diff = round(last - first);
+    var pct = first > 0 ? Math.round((diff / first) * 100) : 0;
+    html += '<div class="statsgrid">' +
+      '<div><div class="stats-k">INICIO</div><div class="stats-v">' + first + " " + unit + "</div></div>" +
+      '<div><div class="stats-k">ACTUAL</div><div class="stats-v">' + last + " " + unit + "</div></div>" +
+      '<div><div class="stats-k">MÁXIMO</div><div class="stats-v">' + best + " " + unit + "</div></div>" +
+      '<div><div class="stats-k">CAMBIO</div><div class="stats-v" style="color:' + (diff > 0 ? accent : diff < 0 ? "#ff6b6b" : "#fff") + '">' + (diff > 0 ? "+" : "") + diff + " " + unit + (first > 0 ? " · " + (pct > 0 ? "+" : "") + pct + " %" : "") + "</div></div>" +
+      "</div>";
+    html += statsChart([
+      { pts: planPts, color: "rgba(255,255,255,0.35)", dashed: true },
+      { pts: logPts, color: accent, dashed: false },
+    ], unit);
+    if (planPts.length && logPts.length) {
+      html += '<div class="stats-legend"><span><i style="background:' + accent + '"></i>Registrado</span><span><i class="dashed"></i>Peso en la rutina</span></div>';
+    }
+    if (logs.length) {
+      html += '<div class="stats-list">' + logs.slice(-8).reverse().map(function (h) {
+        return '<div class="stats-row"><span>' + formatDateEs(h.date) + "</span><span>" + (h.weight > 0 ? h.weight + " kg × " : "") + h.reps + " reps</span></div>";
+      }).join("") + "</div>";
+    }
+    return html + "</div></div>";
+  }
 
   function showToast(msg) {
     toastMsg = msg;
@@ -494,43 +612,24 @@ function initProfileApp(profile, initialData) {
     render();
   }
 
-  /* Registrar lo hecho hoy sirve para cualquier ejercicio. En los que llevan
-     peso, lo registrado pasa a ser el nuevo peso base (normalizado por la
-     fase) y, si se llega a las reps objetivo, sube un escalón. En la semana
-     de descarga el peso base no se toca a propósito. */
+  /* Registrar lo hecho hoy guarda el historial (gráfica y "Últ:"); no cambia
+     los pesos de la rutina, que solo se editan a mano. */
   function app_saveLog(key) {
-    var item = { key: key, base: findExercise(key), custom: !findExercise(key) };
-    var data = getDisplayData(item, progress);
     var scheme = getScheme(key, progress);
     var wRaw = String(document.getElementById("inp-weight").value).trim();
     var w = wRaw === "" ? 0 : parseNum(wRaw);
     var r = parseInt(document.getElementById("inp-reps").value, 10);
     if (isNaN(w) || w < 0 || isNaN(r)) { showToast("Revisa los números introducidos."); return; }
     var prev = progress.exercises[key] || { top: scheme ? (scheme.baseTop || 0) : 0, history: [] };
-    var targetReps = data.targetReps;
-    var reached = !isNaN(targetReps) && r >= targetReps;
-    var newTop = prev.top;
-    var msg = "Guardado ✓";
-    if (scheme && w > 0) {
-      if (currentProfile.key === "descarga") {
-        msg = "Guardado ✓ (semana de descarga: tu peso base no cambia)";
-      } else {
-        var base = round025(w / (weightMultFor(scheme) || 1));
-        newTop = reached ? round(base + scheme.step) : base;
-        msg = reached
-          ? "Guardado ✓ Objetivo cumplido: peso base " + newTop + " kg"
-          : "Guardado ✓ Peso base actualizado a " + newTop + " kg";
-      }
-    }
     var today = todayISO();
     var newHistory = (prev.history || []).filter(function (h) { return h.date !== today; })
-      .concat([{ date: today, weight: w, reps: r, hit: currentProfile.key === "descarga" ? null : reached }]).slice(-40);
-    progress.exercises[key] = { top: newTop, history: newHistory, deloadAt: prev.deloadAt };
+      .concat([{ date: today, weight: w, reps: r }]).slice(-40);
+    progress.exercises[key] = { top: prev.top, history: newHistory, planLog: prev.planLog };
     sessionChecked()[activeDay + "-" + key] = true;
     saveProgress(progress);
     editingId = null;
     RestTimer.start(restSecondsFor(key));
-    showToast(msg);
+    showToast("Guardado ✓");
   }
 
   /* Descanso sugerido: más largo en básicos pesados (≤ 8 reps), más corto en aislamiento. */
@@ -597,52 +696,6 @@ function initProfileApp(profile, initialData) {
     input.click();
   }
 
-  /* Tras 10+ días sin registrar entrenos (vacaciones, enfermedad…) se propone volver con
-     menos peso. En las fases de descarga/parada no se avisa: ya bajan el peso solas. */
-  function lastTrainingDate() {
-    var last = "";
-    Object.keys(progress.exercises).forEach(function (k) {
-      var h = progress.exercises[k].history;
-      if (h && h.length && h[h.length - 1].date > last) last = h[h.length - 1].date;
-    });
-    return last;
-  }
-
-  function reentryInfo() {
-    var last = lastTrainingDate();
-    if (!last) return null;
-    if (progress.reentryAt && progress.reentryAt >= last) return null;
-    var gap = Math.round((new Date(todayISO() + "T00:00:00") - new Date(last + "T00:00:00")) / 86400000);
-    if (gap < 10) return null;
-    var tag = getPhase(phases, todayISO()).tag;
-    if (tag === "Recuperación" || tag === "Mantenimiento") return null;
-    return { days: gap, pct: gap >= 21 ? 15 : 10 };
-  }
-
-  function app_applyReentry() {
-    var info = reentryInfo();
-    if (!info) return;
-    Object.keys(progress.exercises).forEach(function (k) {
-      var e = progress.exercises[k];
-      var scheme = getScheme(k, progress);
-      if (!scheme || !(e.top > 0)) return;
-      var step = scheme.step || 2.5;
-      e.top = round(Math.max(step, Math.round(e.top * (1 - info.pct / 100) / step) * step));
-    });
-    progress.reentryAt = todayISO();
-    saveProgress(progress);
-    showToast("Pesos base reducidos un " + info.pct + " %. Súbelos de nuevo en pocas sesiones.");
-  }
-
-  function app_applyDeload(key) {
-    var e = progress.exercises[key];
-    if (!e) return;
-    e.top = round025(e.top * 0.9);
-    e.deloadAt = todayISO();
-    saveProgress(progress);
-    showToast("Peso base reducido un 10 %: " + e.top + " kg. Desde ahí, a recuperar la progresión.");
-  }
-
   function app_handleReset() {
     if (!confirmReset) {
       confirmReset = true;
@@ -660,9 +713,9 @@ function initProfileApp(profile, initialData) {
   function render() {
     var app = document.getElementById("app");
     var today = todayISO();
-    var currentPhase = getPhase(phases, today);
-    var weekNumber = getWeekNumber(phases, today);
-    var day = days.filter(function (d) { return d.id === activeDay; })[0] || days[0];
+    var day = currentDay();
+    activeDay = day.id;
+    var label = dayLabel(day);
     var effList = effectiveExercises(day, progress);
     var sc = sessionChecked();
     var done = effList.filter(function (item) { return sc[activeDay + "-" + item.key]; }).length;
@@ -680,53 +733,15 @@ function initProfileApp(profile, initialData) {
     /* header */
     html += '<div class="header">' +
       '<div class="glow" style="background:' + day.accent + '"></div>' +
-      '<div class="eyebrow">' + header.eyebrow + "</div>" +
-      '<div class="title">' + header.titleHtml(day.accent) + "</div>" +
-      '<div class="subtitle">' + header.subtitle(weekNumber, currentPhase) + "</div>" +
-      '<div class="phasepill" style="background:' + currentPhase.color + '15;border:1px solid ' + currentPhase.color + '40" onclick="app_togglePlan()">' +
-        '<span class="dot" style="background:' + currentPhase.color + '"></span>' +
-        '<span style="font-size:12px;font-weight:700;color:' + currentPhase.color + '">' + currentPhase.name + "</span>" +
-        '<span style="font-size:10px;color:rgba(255,255,255,0.35)">· ' + currentPhase.tag + "</span>" +
-        '<span class="chevron' + (planOpen ? " open" : "") + '">' + CHEVRON_SVG + "</span>" +
-      "</div>";
-
-    if (planOpen) {
-      html += '<div class="planpanel" style="border:1px solid ' + currentPhase.color + '30">' +
-        '<div class="plandesc">' + currentPhase.desc + "</div>";
-      if (profile.runInfo) {
-        html += '<div class="planlabel">CARRERA</div>' +
-          '<div class="runbox"><div class="runtext">' + profile.runInfo + "</div></div>";
-      }
-      html += '<div class="planlabel">' + profile.planPanelLabel + "</div>";
-      phases.forEach(function (p) {
-        var isCurrent = p.id === currentPhase.id;
-        html += '<div class="phaserow" style="opacity:' + (isCurrent ? 1 : 0.55) + '">' +
-          '<div class="phaseleft">' +
-            '<span class="dot" style="background:' + p.color + '"></span>' +
-            '<span class="phasename' + (isCurrent ? " current" : "") + '">' + p.name + "</span>" +
-            (isCurrent ? '<span class="heretag" style="color:' + p.color + '">ESTÁS AQUÍ</span>' : "") +
-          "</div>" +
-          '<span class="phasedate">' + formatDateEs(p.start) + " – " + formatDateEs(p.end) + "</span>" +
-        "</div>";
-      });
-      html += "</div>";
-    }
-
-    var reentry = reentryInfo();
-    if (reentry) {
-      html += '<div class="stallbox" style="margin:12px 20px 0"><div>⏸ Llevas ' + reentry.days + ' días sin registrar entrenos. Para volver sin agujetas ni lesiones, baja los pesos un ' + reentry.pct + ' % y súbelos de nuevo en pocas sesiones.</div>' +
-        '<div class="stallbtn" onclick="app_applyReentry()">Bajar pesos un ' + reentry.pct + ' %</div></div>';
-    }
-
-    var todayTrainDay = trainingDayForToday(dayMap());
-    if (!todayTrainDay) {
-      var nxtId = nextTrainingDay(dayMap(), new Date().getDay());
-      var nxtDay = days.filter(function (d) { return d.id === nxtId; })[0];
-      html += '<div class="restday-note">Hoy es día de descanso. Tu próximo entreno: <b>' + nxtDay.fullName + " · " + nxtDay.type + "</b></div>";
-    }
+      '<div class="title">' + header.titleHtml(day.accent) + "</div>";
 
     html += '<div class="weekpills">';
-    buildWeekDays().forEach(function (w) {
+    buildWeekDays().forEach(function (w, i) {
+      var wd = [1, 2, 3, 4, 5, 6, 0][i];
+      if (!w.active && editMode) {
+        html += '<div class="daybtn daybtn-add" title="Añadir día de entreno" onclick="app_addDay(' + wd + ')">' + w.label + '<span class="daybtn-plus">+</span></div>';
+        return;
+      }
       var isActive = w.id === activeDay;
       var bg = isActive ? day.accent : (w.active ? "rgba(255,255,255,0.07)" : "transparent");
       var color = isActive ? "#000" : (w.active ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.15)");
@@ -741,13 +756,14 @@ function initProfileApp(profile, initialData) {
     html += '<div class="daycard-wrap"><div class="daycard" style="border:1px solid ' + day.accent + '30">' +
       '<div class="daycard-top"><div>' +
         '<div class="typebadge" style="background:' + day.accent + "20;border:1px solid " + day.accent + '40">' +
-          '<span class="t1" style="color:' + day.accent + '">' + day.type + "</span>" +
+          '<span class="t1" style="color:' + day.accent + '">' + esc(label.type) + "</span>" +
           '<span class="sep" style="background:' + day.accent + '"></span>' +
           '<span class="t2" style="color:' + day.accent + '">' + day.tag.toUpperCase() + "</span>" +
-          '<span class="sep" style="background:' + day.accent + '"></span>' +
-          '<span class="t2" style="color:' + currentPhase.color + '">MODO ' + currentProfile.label.toUpperCase() + "</span>" +
         "</div>" +
-        '<div class="dayname">' + day.fullName + "</div>" +
+        (editMode
+          ? '<input class="dayname-input" value="' + esc(label.fullName) + '" placeholder="Nombre del día" onchange="app_updateDayName(\'' + day.id + '\', \'fullName\', this.value)">' +
+            '<input class="daytype-input" value="' + esc(label.type) + '" placeholder="Tipo (ej. TORSO A)" onchange="app_updateDayName(\'' + day.id + '\', \'type\', this.value)">'
+          : '<div class="dayname">' + esc(label.fullName) + "</div>") +
         '<div class="daysub">' + day.subtitle + "</div>" +
       "</div>" +
       '<div class="pctbox">' +
@@ -755,46 +771,48 @@ function initProfileApp(profile, initialData) {
         '<div class="pctlabel">' + done + "/" + total + " HECHOS</div>" +
       "</div></div>" +
       '<div class="barbg"><div class="barfill" style="width:' + pct + "%;background:linear-gradient(90deg, " + day.accent + "aa, " + day.accent + ')"></div></div>' +
-      '<div class="focus">' + day.focus + "</div>" +
-      '<div class="editbar">' + (editMode ? weekdaySelect(day) : "") + '<div class="editbtn" style="background:' + (editMode ? day.accent : "rgba(255,255,255,0.06)") + ";color:" + (editMode ? "#000" : "rgba(255,255,255,0.5)") + '" onclick="app_toggleEditMode()">' + (editMode ? "✓ Listo" : "✎ Editar rutina") + "</div></div>" +
+      '<div class="editbar">' +
+        (editMode ? '<div class="daydelbtn" onclick="app_removeDay(\'' + day.id + '\')">🗑 Quitar día</div>' + weekdaySelect(day) : "") +
+        '<div class="editbtn" style="background:' + (editMode ? day.accent : "rgba(255,255,255,0.06)") + ";color:" + (editMode ? "#000" : "rgba(255,255,255,0.5)") + '" onclick="app_toggleEditMode()">' + (editMode ? "✓ Listo" : "✎ Editar rutina") + "</div></div>" +
     "</div></div>";
 
     /* exercises */
-    html += '<datalist id="exlib-list">' + EXERCISE_LIBRARY.map(function (e) { return '<option value="' + esc(e.name) + '">'; }).join("") + "</datalist>";
     html += '<div class="exlist">';
+    if (editMode) {
+      html += '<div class="addexbtn" style="margin:0 0 10px" onclick="app_addExercise(\'' + day.id + '\')">+ Añadir ejercicio</div>';
+      var anyRemoved = day.exercises.some(function (ex) { return progress.removed[ex.id]; });
+      if (anyRemoved) {
+        html += '<div class="restorebtn" style="margin:0 0 10px" onclick="app_restoreRemoved(\'' + day.id + '\')">↺ Restaurar ejercicios eliminados de este día</div>';
+      }
+    }
     effList.forEach(function (item) {
       var key = item.key;
       var data = getDisplayData(item, progress);
       var stateKey = activeDay + "-" + key;
-      var isDone = sc[stateKey];
-      var isOpen = expanded[stateKey];
+      var isDone = !editMode && sc[stateKey];
+      var isOpen = editMode || expanded[stateKey];
       var mc = muscleColors[data.muscle] || "#888";
       var pyramid = data.pyramid;
       var entry = progress.exercises[key] || null;
       var lastLog = entry && entry.history && entry.history.length ? entry.history[entry.history.length - 1] : null;
       var isEditingLog = editingId === key;
       var lastRow = pyramid[pyramid.length - 1];
-      var stall = data.progressive ? stallInfo(key) : null;
       var logWeightDefault = lastLog && !data.progressive ? lastLog.weight : (isNaN(parseFloat(lastRow.weight)) ? 0 : parseFloat(lastRow.weight));
       var logRepsDefault = isNaN(data.targetReps) ? (lastLog ? lastLog.reps : "") : data.targetReps;
 
       html += '<div class="excard" style="background:' + (isDone ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)") +
         ";border:1px solid " + (isDone ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.09)") + ";opacity:" + (isDone ? 0.45 : 1) + '">' +
         '<div class="exhead">' +
-          '<div class="chk" style="border:2px solid ' + (isDone ? day.accent : "rgba(255,255,255,0.15)") + ";background:" + (isDone ? day.accent : "transparent") + '" onclick="app_toggleCheck(\'' + key + '\')">' + (isDone ? CHECK_SVG : "") + "</div>" +
-          '<div class="exinfo" onclick="app_toggleExpand(\'' + key + '\')">' +
+          (editMode ? "" : '<div class="chk" style="border:2px solid ' + (isDone ? day.accent : "rgba(255,255,255,0.15)") + ";background:" + (isDone ? day.accent : "transparent") + '" onclick="app_toggleCheck(\'' + key + '\')">' + (isDone ? CHECK_SVG : "") + "</div>") +
+          '<div class="exinfo"' + (editMode ? "" : ' onclick="app_toggleExpand(\'' + key + '\')"') + '>' +
             (editMode ?
               '<div class="exname-row">' +
-                '<input list="exlib-list" class="exname-input" value="' + esc(data.name) + '" onchange="app_updateExerciseName(\'' + key + '\', this.value)" onclick="event.stopPropagation()">' +
+                '<input class="exname-input" value="' + esc(data.name) + '" onchange="app_updateExerciseName(\'' + key + '\', this.value)">' +
               "</div>" +
               '<div class="exname-row" style="margin-top:6px">' +
-                '<select class="muscle-select" onchange="app_updateExerciseMuscle(\'' + key + '\', this.value)" onclick="event.stopPropagation()">' + muscleOptions(data.muscle) + "</select>" +
+                '<select class="muscle-select" onchange="app_updateExerciseMuscle(\'' + key + '\', this.value)">' + muscleOptions(data.muscle) + "</select>" +
                 '<span class="muscletag" style="background:' + mc + "20;color:" + mc + '">' + esc(data.muscle).toUpperCase() + "</span>" +
-              "</div>" +
-              '<div class="exname-row" style="margin-top:6px"><select class="muscle-select" style="max-width:100%" onchange="if (this.value) app_updateExerciseName(\'' + key + '\', this.value)" onclick="event.stopPropagation()">' +
-                '<option value="">↔ Sustituir por…</option>' +
-                libraryAlternatives(data.muscle, data.name).map(function (e) { return '<option value="' + esc(e.name) + '">' + esc(e.name) + " · " + equipOf(e.name) + "</option>"; }).join("") +
-              "</select></div>"
+              "</div>"
               :
               '<div class="exname-row">' +
                 '<span class="exname" style="color:' + (isDone ? "rgba(255,255,255,0.3)" : "#fff") + ";text-decoration:" + (isDone ? "line-through" : "none") + '">' + esc(data.name) + "</span>" +
@@ -802,12 +820,13 @@ function initProfileApp(profile, initialData) {
               "</div>"
             ) +
             '<div class="exmeta">' + pyramid.length + " series · " + (data.ranged ? esc(pyramid[0].reps) : esc(pyramid[0].reps) + "→" + esc(pyramid[pyramid.length - 1].reps)) + " reps" +
-              (stall ? " · ⚠ estancado" : "") +
               (lastLog ? " · Últ: " + lastLog.weight + " kg×" + lastLog.reps + " (" + formatDateEs(lastLog.date) + ")" : "") +
             "</div>" +
           "</div>" +
-          (editMode ? '<div class="movebtns"><div class="movebtn" onclick="app_moveExercise(\'' + key + '\', -1)">▲</div><div class="movebtn" onclick="app_moveExercise(\'' + key + '\', 1)">▼</div></div>' : "") +
-          '<div class="expbtn" style="transform:' + (isOpen ? "rotate(180deg)" : "rotate(0deg)") + '" onclick="app_toggleExpand(\'' + key + '\')">' + CHEVRON_SVG + "</div>" +
+          (editMode
+            ? '<div class="movebtns"><div class="movebtn" onclick="app_moveExercise(\'' + key + '\', -1)">▲</div><div class="movebtn" onclick="app_moveExercise(\'' + key + '\', 1)">▼</div></div>'
+            : '<div class="statbtn" title="Estadísticas" onclick="app_openStats(\'' + key + '\')">' + STATS_SVG + "</div>" +
+              '<div class="expbtn" style="transform:' + (isOpen ? "rotate(180deg)" : "rotate(0deg)") + '" onclick="app_toggleExpand(\'' + key + '\')">' + CHEVRON_SVG + "</div>") +
         "</div>";
 
       if (isOpen) {
@@ -841,12 +860,6 @@ function initProfileApp(profile, initialData) {
         if (!editMode && entry && entry.history && entry.history.length > 1) {
           html += sparkline(entry.history, day.accent);
         }
-        if (stall && !editMode) {
-          html += '<div class="stallbox"><div>⚠ Dos sesiones seguidas sin llegar al objetivo con ' + stall.weight + ' kg. Prueba a bajar un 10 % y subir desde ahí.</div>' +
-            '<div class="stallbtn" onclick="app_applyDeload(\'' + key + '\')">Bajar un 10 %</div></div>';
-        }
-        html += '<div class="tip">' + esc(data.note) + "</div>";
-
         if (editMode) {
           html += '<div class="exdelbtn" onclick="app_removeExercise(\'' + key + '\')">🗑 Eliminar este ejercicio</div>';
         } else {
@@ -871,13 +884,6 @@ function initProfileApp(profile, initialData) {
       }
       html += "</div>";
     });
-    if (editMode) {
-      var anyRemoved = day.exercises.some(function (ex) { return progress.removed[ex.id]; });
-      if (anyRemoved) {
-        html += '<div class="restorebtn" onclick="app_restoreRemoved(\'' + day.id + '\')">↺ Restaurar ejercicios eliminados de este día</div>';
-      }
-      html += '<div class="addexbtn" onclick="app_addExercise(\'' + day.id + '\')">+ Añadir ejercicio</div>';
-    }
     html += "</div>";
 
     /* weekly overview */
@@ -900,25 +906,7 @@ function initProfileApp(profile, initialData) {
         '<div class="setbar"><div class="setfill" style="width:' + Math.min(100, Math.round(m.sets / 24 * 100)) + "%;background:" + color + '"></div></div>' +
         '<span class="setnum" style="color:' + color + '">' + m.sets + "</span></div>";
     });
-    html += '<div class="overtag" style="display:block;margin-top:10px;line-height:1.5">Para ganar músculo, la evidencia apunta a ~10–20 series por músculo y semana (naranja: te quedas corto · amarillo: de más). Cuenta solo series directas: los básicos también trabajan hombro, tríceps o glúteo.</div></div>';
-
-    /* progression rule */
-    var ruleText = currentPhase.rule || (
-      currentPhase.tag === "Mantenimiento"
-      ? "Estás en fase de mantenimiento. No busques subir peso: repite lo que puedas, con buena técnica, sin agobios."
-      : currentPhase.tag === "Recuperación"
-      ? "Semana de descarga: los pesos y series de abajo YA están reducidos automáticamente (~12% menos peso, una serie menos). Es parte del plan, no un retroceso."
-      : currentPhase.tag === "Volumen"
-      ? "Bloque de hipertrofia: más reps y algo menos de peso, ya calculado automáticamente. Descansa 60–90 seg y prioriza sentir el músculo."
-      : currentPhase.tag === "Test de progreso"
-      ? "Semana de test: pesos algo más altos, menos series. Prueba tus máximos con calma y buena técnica."
-      : 'Cuando completes todas las reps de la última serie → pulsa "Registrar" y sube el peso. Sin llegar al tope, repite el mismo peso. Así de simple.'
-    );
-
-    html += '<div class="rulebox" style="background:' + day.accent + "10;border:1px solid " + day.accent + '25">' +
-      '<div class="rulelabel" style="color:' + day.accent + '">REGLA DE PROGRESIÓN · ' + currentPhase.name.toUpperCase() + "</div>" +
-      '<div class="ruletext">' + ruleText + "</div>" +
-    "</div>";
+    html += "</div>";
 
     /* footer */
     html += '<div class="footer"><div class="resetlink" style="color:' + (confirmReset ? "#FF6B35" : "rgba(255,255,255,0.2)") + '" onclick="app_handleReset()">' +
@@ -931,10 +919,11 @@ function initProfileApp(profile, initialData) {
 
     html += "</div>";
 
+    if (statsKey && !editMode) html += statsHtml(statsKey, day.accent);
+
     app.innerHTML = html;
   }
 
-  window.app_togglePlan = app_togglePlan;
   window.app_setActiveDay = app_setActiveDay;
   window.app_toggleCheck = app_toggleCheck;
   window.app_toggleExpand = app_toggleExpand;
@@ -948,14 +937,17 @@ function initProfileApp(profile, initialData) {
   window.app_addExercise = app_addExercise;
   window.app_restoreRemoved = app_restoreRemoved;
   window.app_moveExercise = app_moveExercise;
-  window.app_applyDeload = app_applyDeload;
-  window.app_applyReentry = app_applyReentry;
+  window.app_updateDayName = app_updateDayName;
+  window.app_addDay = app_addDay;
+  window.app_removeDay = app_removeDay;
   window.app_exportData = app_exportData;
   window.app_importData = app_importData;
   window.app_setDayWeekday = app_setDayWeekday;
   window.app_openLogger = app_openLogger;
   window.app_saveLog = app_saveLog;
   window.app_cancelLogger = app_cancelLogger;
+  window.app_openStats = app_openStats;
+  window.app_closeStats = app_closeStats;
   window.app_handleReset = app_handleReset;
   render();
 }

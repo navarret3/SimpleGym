@@ -18,7 +18,8 @@ function formatDateEs(iso) {
 }
 
 var CHECK_SVG = '<svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-var CHEVRON_SVG = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4.5L6 8L10 4.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var STATS_SVG = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 12.5h11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/><path d="M3 10V7M7 10V3.5M11 10V5.5" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round"/></svg>';
+var CHEVRON_SVG ='<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4.5L6 8L10 4.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 /* ============================================================
    MOTOR DE PERIODIZACIÓN COMPARTIDO

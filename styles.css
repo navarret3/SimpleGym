@@ -136,6 +136,36 @@
   .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 50; background: #111; color: #fff; font-size: 12px; font-weight: 700; padding: 9px 16px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); white-space: nowrap; }
   .loading { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); font-size: 13px; letter-spacing: 2px; }
 
+.dayname-input, .daytype-input { font-family: 'Syne', sans-serif; font-weight: 800; color: #fff; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; padding: 6px 10px; width: 100%; max-width: 260px; display: block; }
+.dayname-input { font-size: 22px; letter-spacing: -0.5px; }
+.daytype-input { font-size: 12px; letter-spacing: 1px; margin-top: 6px; }
+.dayname-input:focus, .daytype-input:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+.daybtn-add { position: relative; border: 1px dashed rgba(255,255,255,0.3); color: rgba(255,255,255,0.45); cursor: pointer; }
+.daybtn-plus { position: absolute; top: -6px; right: -5px; width: 15px; height: 15px; border-radius: 50%; background: #C8FF00; color: #000; font-size: 11px; font-weight: 800; line-height: 15px; text-align: center; }
+.daydelbtn { margin-right: auto; padding: 8px 12px; border-radius: 10px; background: rgba(255,80,80,0.1); color: #ff6b6b; font-size: 11px; font-weight: 800; cursor: pointer; min-height: 36px; display: flex; align-items: center; }
+.editbar { flex-wrap: wrap; }
+.statbtn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: rgba(255,255,255,0.06); flex-shrink: 0; cursor: pointer; }
+.statbtn:active { transform: scale(0.96); }
+.statsmodal { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,0.7); display: flex; align-items: flex-end; justify-content: center; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom)); overflow-y: auto; }
+.statscard { width: 100%; max-width: 520px; background: #141414; border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+@media (min-width: 600px) { .statsmodal { align-items: center; } }
+.statshead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.stats-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: 3px; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
+.stats-title { font-size: 18px; font-weight: 800; line-height: 1.2; }
+.stats-close { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-weight: 800; cursor: pointer; flex-shrink: 0; }
+.statsgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+.statsgrid > div { background: rgba(255,255,255,0.04); border-radius: 10px; padding: 10px 12px; }
+.stats-k { font-size: 9px; font-weight: 700; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
+.stats-v { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stats-svg { width: 100%; height: auto; display: block; }
+.stats-axis { font-family: 'Syne', sans-serif; font-size: 9px; font-weight: 700; fill: rgba(255,255,255,0.45); }
+.stats-legend { display: flex; gap: 14px; font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 6px; }
+.stats-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.stats-legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.stats-legend i.dashed { background: repeating-linear-gradient(90deg, rgba(255,255,255,0.45) 0 4px, transparent 4px 7px); }
+.stats-list { margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); }
+.stats-row { display: flex; justify-content: space-between; font-size: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: rgba(255,255,255,0.75); font-variant-numeric: tabular-nums; }
+.stats-empty { font-size: 13px; color: rgba(255,255,255,0.5); padding: 10px 0 4px; }
 .setrow { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
 .setname { width: 82px; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.75); flex-shrink: 0; }
 .setbar { flex: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.07); overflow: hidden; }
@@ -179,3 +209,4 @@ html { -webkit-text-size-adjust: 100%; }
 .footer { padding-bottom: 90px; }
 .footer .resetlink { color: rgba(255,255,255,0.4); }
 .sync { font-size: 10px; color: rgba(255,255,255,0.35); margin-top: 6px; }
+.title { font-size: clamp(28px, 9.5vw, 38px); }
